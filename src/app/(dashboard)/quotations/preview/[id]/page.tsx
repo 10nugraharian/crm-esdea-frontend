@@ -138,7 +138,7 @@ export default function QuotationPreviewPage(props: PageProps) {
     <div className="min-h-screen bg-gray-300 py-8 print:py-0 print:bg-white font-[Tahoma] text-[12px] text-gray-900">
       
       {/* Floating Action Bar (Hidden on Print) */}
-      <div className="fixed top-4 left-1/2 -translate-x-1/2 flex gap-4 bg-white px-6 py-3 rounded-full shadow-lg print:hidden z-50">
+      <div className="fixed top-16 left-1/2 -translate-x-1/2 flex gap-4 bg-white px-6 py-3 rounded-full shadow-lg print:hidden z-50 border border-gray-100">
         <Link href="/quotations" className="flex items-center text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
           <ArrowLeft className="w-4 h-4 mr-2" />
           Kembali
