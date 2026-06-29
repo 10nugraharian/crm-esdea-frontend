@@ -108,8 +108,10 @@ export default function QuotationPreviewPage(props: PageProps) {
         return;
       }
       
-      const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:8000/api/quotations/${params.id}/pdf`, {
+      const Cookies = (await import('js-cookie')).default;
+      const token = Cookies.get('auth_token');
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
+      const res = await fetch(`${baseUrl}/quotations/${params.id}/pdf`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
