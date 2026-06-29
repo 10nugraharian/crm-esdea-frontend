@@ -145,8 +145,11 @@ export default function DashboardLayout({
                   <div className="h-px bg-gray-100 my-1"></div>
                   <button 
                     onClick={() => {
-                      alert("Signing out...");
-                      setIsProfileOpen(false);
+                      import('js-cookie').then(Cookies => {
+                        Cookies.default.remove('auth_token');
+                        Cookies.default.remove('user_data');
+                        window.location.href = '/login';
+                      });
                     }}
                     className="flex items-center w-full px-4 py-2 text-[13px] text-red-600 hover:bg-red-50 transition-colors text-left"
                   >
