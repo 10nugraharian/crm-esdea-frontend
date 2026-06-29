@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Search, 
   Filter, 
@@ -13,93 +13,28 @@ import {
   X
 } from "lucide-react";
 import Modal from "@/components/Modal";
+import { fetchApi } from "@/lib/api";
 
 interface UserProfile {
   id: string;
-  no: number;
   userId: string;
   namaLengkap: string;
-  gender: "Laki-laki" | "Perempuan";
-  tanggalLahir: string;
-  noRekening: string;
-  namaBank: string;
-  namaLeader: string | null;
-  namaManager: string | null;
+  gender?: "Laki-laki" | "Perempuan" | null;
+  tanggalLahir?: string | null;
+  noRekening?: string | null;
+  namaBank?: string | null;
+  namaLeader?: string | null;
+  namaManager?: string | null;
   username: string;
   role: string;
+  password?: string; // used for form
 }
 
-const initialUsers: UserProfile[] = [
-  { 
-    id: "USR-001", no: 1, 
-    userId: "829103",
-    namaLengkap: "Rian Nugraha", 
-    gender: "Laki-laki",
-    tanggalLahir: "1990-05-15",
-    noRekening: "1234567890",
-    namaBank: "BCA",
-    namaLeader: "Budi Santoso",
-    namaManager: "Agus Salim",
-    username: "rian.nugraha",
-    role: "Director / BOD"
-  },
-  { 
-    id: "USR-002", no: 2, 
-    userId: "472819",
-    namaLengkap: "Siti Aminah", 
-    gender: "Perempuan",
-    tanggalLahir: "1992-08-21",
-    noRekening: "0987654321",
-    namaBank: "Mandiri",
-    namaLeader: "Budi Santoso",
-    namaManager: "Agus Salim",
-    username: "siti.aminah",
-    role: "Sales"
-  },
-  { 
-    id: "USR-003", no: 3, 
-    userId: "103948",
-    namaLengkap: "Budi Santoso", 
-    gender: "Laki-laki",
-    tanggalLahir: "1988-11-30",
-    noRekening: "1122334455",
-    namaBank: "BNI",
-    namaLeader: null,
-    namaManager: "Agus Salim",
-    username: "budi.santoso",
-    role: "Sales Leader"
-  },
-  { 
-    id: "USR-004", no: 4, 
-    userId: "551234",
-    namaLengkap: "Agus Salim", 
-    gender: "Laki-laki",
-    tanggalLahir: "1985-02-10",
-    noRekening: "555666777",
-    namaBank: "BRI",
-    namaLeader: null,
-    namaManager: null,
-    username: "agus.salim",
-    role: "Sales Manager"
-  },
-  { 
-    id: "USR-005", no: 5, 
-    userId: "998877",
-    namaLengkap: "Diana Putri", 
-    gender: "Perempuan",
-    tanggalLahir: "1995-12-05",
-    noRekening: "999888777",
-    namaBank: "BCA",
-    namaLeader: null,
-    namaManager: null,
-    username: "diana.finance",
-    role: "Finance"
-  }
-];
-
 export default function UsersPage() {
-  const [users, setUsers] = useState<UserProfile[]>(initialUsers);
+  const [users, setUsers] = useState<UserProfile[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -109,8 +44,63 @@ export default function UsersPage() {
   const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
   const [resettingUser, setResettingUser] = useState<UserProfile | null>(null);
 
-  // Form states
   const [formData, setFormData] = useState<Partial<UserProfile>>({});
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const loadUsers = async () => {
+    try {
+      setLoading(true);
+      const data = await fetchApi('/users');
+      setUsers(data);
+    } catch (error) {
+      console.error("Failed to load users", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      if (isAddModalOpen) {
+        await fetchApi('/users', {
+          method: 'POST',
+          body: JSON.stringify(formData),
+        });
+      } else if (isEditModalOpen && formData.id) {
+        await fetchApi(`/users/${formData.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(formData),
+        });
+      }
+      await loadUsers();
+      setIsAddModalOpen(false);
+      setIsEditModalOpen(false);
+    } catch (error: any) {
+      alert("Gagal menyimpan pengguna: " + error.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!resettingUser) return;
+    try {
+      setSaving(true);
+      await fetchApi(`/users/${resettingUser.id}/reset-password`, {
+        method: 'POST'
+      });
+      alert("Password berhasil di-reset ke default: esdea123");
+      setIsResetPasswordModalOpen(false);
+    } catch (error: any) {
+      alert("Gagal reset password: " + error.message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const filteredUsers = users.filter(u => 
     u.namaLengkap.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -130,7 +120,7 @@ export default function UsersPage() {
           <button 
             className="flex items-center px-4 py-1.5 text-[13px] font-medium text-white bg-brand-700 rounded hover:bg-brand-800 transition-colors shadow-sm" 
             onClick={() => {
-              setFormData({});
+              setFormData({ gender: 'Laki-laki', role: 'Sales' });
               setIsAddModalOpen(true);
             }}
           >
@@ -165,8 +155,8 @@ export default function UsersPage() {
         </div>
 
         <div className="flex items-center gap-2 text-gray-500">
-          <button className="flex items-center px-2 py-1 text-[13px] font-medium hover:text-gray-900 transition-colors rounded hover:bg-gray-100">
-            <Columns className="w-3.5 h-3.5 mr-1.5" /> Columns
+          <button onClick={loadUsers} className="flex items-center px-2 py-1 text-[13px] font-medium hover:text-gray-900 transition-colors rounded hover:bg-gray-100">
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </button>
         </div>
       </div>
@@ -189,7 +179,14 @@ export default function UsersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 align-top">
-              {filteredUsers.map((u) => (
+              {loading && users.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                    <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-brand-600" />
+                    Memuat data pengguna...
+                  </td>
+                </tr>
+              ) : filteredUsers.map((u) => (
                 <tr 
                   key={u.id} 
                   className="hover:bg-brand-50/40 group transition-colors cursor-pointer"
@@ -217,12 +214,12 @@ export default function UsersPage() {
                     </span>
                   </td>
                   <td className="px-4 py-2.5 align-middle">
-                    <div className="text-gray-800">{u.gender}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">{u.tanggalLahir}</div>
+                    <div className="text-gray-800">{u.gender || "-"}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{u.tanggalLahir || "-"}</div>
                   </td>
                   <td className="px-4 py-2.5 align-middle">
-                    <div className="font-medium text-gray-700">{u.namaBank}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">{u.noRekening}</div>
+                    <div className="font-medium text-gray-700">{u.namaBank || "-"}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{u.noRekening || "-"}</div>
                   </td>
                   <td className="px-4 py-2.5 align-middle">
                     <div className="text-xs text-gray-700"><span className="text-gray-400 font-semibold">L:</span> {u.namaLeader || "-"}</div>
@@ -230,9 +227,9 @@ export default function UsersPage() {
                   </td>
                 </tr>
               ))}
-              {filteredUsers.length === 0 && (
+              {!loading && filteredUsers.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                     Tidak ada data pengguna yang ditemukan.
                   </td>
                 </tr>
@@ -351,55 +348,61 @@ export default function UsersPage() {
                 setIsAddModalOpen(false);
                 setIsEditModalOpen(false);
               }}
-              className="px-4 py-2 text-[13px] font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
+              disabled={saving}
+              className="px-4 py-2 text-[13px] font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
             >
               Batal
             </button>
             <button 
-              onClick={() => {
-                setIsAddModalOpen(false);
-                setIsEditModalOpen(false);
-              }}
-              className="px-4 py-2 text-[13px] font-medium text-white bg-brand-700 rounded hover:bg-brand-800"
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center px-4 py-2 text-[13px] font-medium text-white bg-brand-700 rounded hover:bg-brand-800 disabled:opacity-50"
             >
-              Simpan
+              {saving && <RefreshCw className="w-3.5 h-3.5 mr-2 animate-spin" />}
+              {saving ? "Menyimpan..." : "Simpan"}
             </button>
           </>
         }
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Nama Lengkap</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Nama Lengkap *</label>
             <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded text-[13px] focus:ring-brand-500 focus:border-brand-500" value={formData.namaLengkap || ''} onChange={e => setFormData({...formData, namaLengkap: e.target.value})} />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Username</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Username *</label>
             <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded text-[13px] focus:ring-brand-500 focus:border-brand-500" value={formData.username || ''} onChange={e => setFormData({...formData, username: e.target.value})} />
           </div>
           {isAddModalOpen && (
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Password</label>
-              <input type="password" placeholder="Password untuk akun ini" className="w-full px-3 py-2 border border-gray-300 rounded text-[13px] focus:ring-brand-500 focus:border-brand-500" />
+              <label className="block text-xs font-medium text-gray-700 mb-1">Password *</label>
+              <input type="password" placeholder="Password untuk akun ini" className="w-full px-3 py-2 border border-gray-300 rounded text-[13px] focus:ring-brand-500 focus:border-brand-500" value={formData.password || ''} onChange={e => setFormData({...formData, password: e.target.value})} />
             </div>
           )}
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Role</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Role *</label>
             <select className="w-full px-3 py-2 border border-gray-300 rounded text-[13px] focus:ring-brand-500 focus:border-brand-500" value={formData.role || ''} onChange={e => setFormData({...formData, role: e.target.value})}>
               <option value="">Pilih Role...</option>
-              <option value="Sales">Sales</option>
-              <option value="Sales Leader">Sales Leader</option>
-              <option value="Sales Manager">Sales Manager</option>
-              <option value="Finance">Finance</option>
-              <option value="Director / BOD">Director / BOD</option>
-              <option value="Admin">Admin</option>
+              <option value="SALES">Sales</option>
+              <option value="LEADER">Sales Leader</option>
+              <option value="MANAGER">Sales Manager</option>
+              <option value="FINANCE">Finance</option>
+              <option value="BOD">Director / BOD</option>
+              <option value="ADMIN">Admin System</option>
+              <option value="SSO">SSO</option>
             </select>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Gender</label>
-            <select className="w-full px-3 py-2 border border-gray-300 rounded text-[13px] focus:ring-brand-500 focus:border-brand-500" value={formData.gender || ''} onChange={e => setFormData({...formData, gender: e.target.value as "Laki-laki" | "Perempuan"})}>
+            <select className="w-full px-3 py-2 border border-gray-300 rounded text-[13px] focus:ring-brand-500 focus:border-brand-500" value={formData.gender || ''} onChange={e => setFormData({...formData, gender: (e.target.value as "Laki-laki" | "Perempuan" | "") || null})}>
+              <option value="">Tidak ditentukan</option>
               <option value="Laki-laki">Laki-laki</option>
               <option value="Perempuan">Perempuan</option>
             </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Tanggal Lahir</label>
+            <input type="date" className="w-full px-3 py-2 border border-gray-300 rounded text-[13px] focus:ring-brand-500 focus:border-brand-500" value={formData.tanggalLahir || ''} onChange={e => setFormData({...formData, tanggalLahir: e.target.value})} />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Nama Bank</label>
@@ -408,14 +411,6 @@ export default function UsersPage() {
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Nomor Rekening</label>
             <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded text-[13px] focus:ring-brand-500 focus:border-brand-500" value={formData.noRekening || ''} onChange={e => setFormData({...formData, noRekening: e.target.value})} />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Leader (Opsional)</label>
-            <input type="text" placeholder="Nama Leader" className="w-full px-3 py-2 border border-gray-300 rounded text-[13px] focus:ring-brand-500 focus:border-brand-500" value={formData.namaLeader || ''} onChange={e => setFormData({...formData, namaLeader: e.target.value})} />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Manager (Opsional)</label>
-            <input type="text" placeholder="Nama Manager" className="w-full px-3 py-2 border border-gray-300 rounded text-[13px] focus:ring-brand-500 focus:border-brand-500" value={formData.namaManager || ''} onChange={e => setFormData({...formData, namaManager: e.target.value})} />
           </div>
         </div>
       </Modal>
@@ -429,25 +424,25 @@ export default function UsersPage() {
           <>
             <button 
               onClick={() => setIsResetPasswordModalOpen(false)}
-              className="px-4 py-2 text-[13px] font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
+              disabled={saving}
+              className="px-4 py-2 text-[13px] font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
             >
               Batal
             </button>
             <button 
-              onClick={() => {
-                alert("Password berhasil di-reset ke default: esdea123");
-                setIsResetPasswordModalOpen(false);
-              }}
-              className="px-4 py-2 text-[13px] font-medium text-white bg-red-600 rounded hover:bg-red-700"
+              onClick={handleResetPassword}
+              disabled={saving}
+              className="flex items-center px-4 py-2 text-[13px] font-medium text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50"
             >
-              Ya, Reset Password
+              {saving && <RefreshCw className="w-3.5 h-3.5 mr-2 animate-spin" />}
+              {saving ? "Memproses..." : "Ya, Reset Password"}
             </button>
           </>
         }
       >
         <div className="text-[13px] text-gray-600">
           Apakah Anda yakin ingin mereset kata sandi untuk pengguna <strong className="text-gray-900">{resettingUser?.namaLengkap}</strong>? 
-          Kata sandi akan dikembalikan ke nilai bawaan (default). Pengguna ini akan diminta untuk mengganti kata sandi pada saat login berikutnya.
+          Kata sandi akan dikembalikan ke nilai bawaan (default).
         </div>
       </Modal>
 
