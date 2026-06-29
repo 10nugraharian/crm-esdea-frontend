@@ -26,6 +26,7 @@ interface UserProfile {
   namaLeader?: string | null;
   namaManager?: string | null;
   username: string;
+  email?: string;
   role: string;
   password?: string; // used for form
 }
@@ -370,8 +371,8 @@ export default function UsersPage() {
             <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded text-[13px] focus:ring-brand-500 focus:border-brand-500" value={formData.namaLengkap || ''} onChange={e => setFormData({...formData, namaLengkap: e.target.value})} />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Username *</label>
-            <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded text-[13px] focus:ring-brand-500 focus:border-brand-500" value={formData.username || ''} onChange={e => setFormData({...formData, username: e.target.value})} />
+            <label className="block text-xs font-medium text-gray-700 mb-1">Email *</label>
+            <input type="email" className="w-full px-3 py-2 border border-gray-300 rounded text-[13px] focus:ring-brand-500 focus:border-brand-500" value={formData.email || ''} onChange={e => setFormData({...formData, email: e.target.value})} />
           </div>
           {isAddModalOpen && (
             <div>
