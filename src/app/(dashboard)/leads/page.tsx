@@ -755,7 +755,7 @@ export default function LeadsPage() {
           <p>
             Pastikan kolom pada file CSV/Excel Anda mencakup format standar (Nama Perusahaan, PIC, Nomor Telepon, Status).
           </p>
-          <button onClick={() => alert("Mengunduh Template_Import_Leads.xlsx")} className="flex items-center text-brand-600 font-medium hover:underline text-[13px]">
+          <button onClick={handleDownloadTemplate} className="flex items-center text-brand-600 font-medium hover:underline text-[13px]">
             <FileSpreadsheet className="w-4 h-4 mr-2" />
             Download Template Import Leads
           </button>
