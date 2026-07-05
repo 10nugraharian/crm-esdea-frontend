@@ -21,6 +21,7 @@ import {
 import Link from "next/link";
 import Modal from "@/components/Modal";
 import { fetchApi } from "@/lib/api";
+import * as XLSX from "xlsx";
 
 type LeadStatus = "NEW" | "CONTACTED" | "RESPONSE" | "QUOTATION" | "WON" | "LOST";
 type QualificationStatus = "HOT" | "WARM" | "COLD" | "UNQUALIFIED";
@@ -123,40 +124,26 @@ export default function LeadsPage() {
 
   const handleExport = () => {
     if (leads.length === 0) return alert("Tidak ada data untuk diekspor");
-    const headers = ['ID', 'Perusahaan', 'PIC', 'Telepon', 'Status', 'Wilayah', 'Klasifikasi'];
-    const csvRows = [headers.join(",")];
-    leads.forEach(lead => {
-      const row = [
-        lead.id,
-        `"${lead.nama_perusahaan || ''}"`,
-        `"${lead.nama_pic || ''}"`,
-        `"${lead.no_telepon || ''}"`,
-        lead.status_leads,
-        `"${lead.wilayah || ''}"`,
-        `"${lead.sub_klasifikasi || ''}"`
-      ];
-      csvRows.push(row.join(","));
-    });
-    const csvContent = "data:text/csv;charset=utf-8," + csvRows.join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Export_Leads_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const worksheet = XLSX.utils.json_to_sheet(leads.map(lead => ({
+      ID: lead.id,
+      Perusahaan: lead.nama_perusahaan || '',
+      PIC: lead.nama_pic || '',
+      Telepon: lead.no_telepon || '',
+      Status: lead.status_leads,
+      Wilayah: Array.isArray(lead.wilayah) ? lead.wilayah.join(', ') : (lead.wilayah || ''),
+      Klasifikasi: lead.sub_klasifikasi || ''
+    })));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Leads");
+    XLSX.writeFile(workbook, `Export_Leads_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   const handleDownloadTemplate = () => {
-    const headers = ['nama_perusahaan', 'jenis_perusahaan', 'status_leads', 'nama_pic', 'no_telepon', 'email'];
-    const csvContent = "data:text/csv;charset=utf-8," + headers.join(",");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "Template_Import_Leads.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const headers = [['nama_perusahaan', 'jenis_perusahaan', 'status_leads', 'nama_pic', 'no_telepon', 'email']];
+    const worksheet = XLSX.utils.aoa_to_sheet(headers);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Template");
+    XLSX.writeFile(workbook, "Template_Import_Leads.xlsx");
   };
 
   const filteredLeads = leads.filter(lead => {
