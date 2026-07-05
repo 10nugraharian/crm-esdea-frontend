@@ -62,6 +62,7 @@ export default function LeadsPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [formData, setFormData] = useState<Partial<Lead>>({});
   const [wilayahOptions, setWilayahOptions] = useState<{id: string, text: string}[]>([]);
+  const [importFile, setImportFile] = useState<File | null>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("Any");
@@ -139,11 +140,52 @@ export default function LeadsPage() {
   };
 
   const handleDownloadTemplate = () => {
-    const headers = [['nama_perusahaan', 'jenis_perusahaan', 'status_leads', 'nama_pic', 'no_telepon', 'email']];
+    const headers = [['nama_perusahaan', 'jenis_perusahaan', 'wilayah', 'alamat', 'status_leads', 'kualifikasi', 'tingkat_kualifikasi', 'sub_klasifikasi', 'tanggal_expired', 'nama_pic', 'no_telepon', 'email']];
     const worksheet = XLSX.utils.aoa_to_sheet(headers);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Template");
     XLSX.writeFile(workbook, "Template_Import_Leads.xlsx");
+  };
+
+  const handleImport = async () => {
+    if (!importFile) return alert("Pilih file terlebih dahulu");
+    setIsLoading(true);
+    try {
+      let fileToUpload = importFile;
+      
+      // If it's an Excel file, we convert it to CSV first so the backend fgetcsv works seamlessly
+      if (importFile.name.endsWith('.xlsx')) {
+        const buffer = await importFile.arrayBuffer();
+        const wb = XLSX.read(buffer);
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const csvString = XLSX.utils.sheet_to_csv(ws);
+        fileToUpload = new File([csvString], "converted.csv", { type: "text/csv" });
+      }
+
+      const formData = new FormData();
+      formData.append('file', fileToUpload);
+
+      // fetchApi wrapper assumes JSON if body is a string. For FormData, we should use native fetch with token
+      const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/leads/import`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+      
+      alert("Data leads berhasil diimport.");
+      setIsImportModalOpen(false);
+      setImportFile(null);
+      loadLeads();
+    } catch (error: any) {
+      alert("Gagal mengimport: " + error.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const filteredLeads = leads.filter(lead => {
@@ -726,14 +768,11 @@ export default function LeadsPage() {
               Batal
             </button>
             <button 
-              onClick={() => {
-                alert("Data leads berhasil diimport.");
-                setIsImportModalOpen(false);
-                loadLeads();
-              }}
-              className="px-4 py-2 text-[13px] font-medium text-white bg-brand-700 rounded hover:bg-brand-800"
+              onClick={handleImport}
+              disabled={isLoading || !importFile}
+              className="px-4 py-2 text-[13px] font-medium text-white bg-brand-700 rounded hover:bg-brand-800 disabled:opacity-50"
             >
-              Import Data
+              {isLoading ? "Mengimport..." : "Import Data"}
             </button>
           </>
         }
@@ -746,11 +785,19 @@ export default function LeadsPage() {
             <FileSpreadsheet className="w-4 h-4 mr-2" />
             Download Template Import Leads
           </button>
-          <div className="border-2 border-dashed border-gray-300 rounded-md p-8 flex flex-col items-center justify-center text-center bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer">
+          <label className="border-2 border-dashed border-gray-300 rounded-md p-8 flex flex-col items-center justify-center text-center bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer relative">
+            <input 
+              type="file" 
+              accept=".csv, .xlsx" 
+              onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
             <Upload className="w-8 h-8 text-gray-400 mb-2" />
-            <div className="font-medium text-gray-900 mb-1">Pilih File CSV atau Excel</div>
+            <div className="font-medium text-gray-900 mb-1">
+              {importFile ? importFile.name : "Pilih File CSV atau Excel"}
+            </div>
             <div className="text-xs text-gray-500">Max. ukuran file: 10MB</div>
-          </div>
+          </label>
         </div>
       </Modal>
 
