@@ -155,7 +155,7 @@ export default function QuotationPreviewPage(props: PageProps) {
           <div className="text-[12px] mb-4 leading-relaxed">
             <p>Kepada Yth,</p>
             <p className="font-bold">{quotation.lead?.nama_perusahaan}</p>
-            <p>Up. {quotation.lead?.nama_pic || '-'} {quotation.lead?.no_wa ? `- ${quotation.lead.no_wa}` : ''}</p>
+            <p>Up. {quotation.lead?.nama_pic || '-'} {quotation.lead?.no_wa ? `(${quotation.lead.no_wa})` : ''}</p>
           </div>
 
           <div className="text-[12px] mb-3 leading-relaxed text-justify">
