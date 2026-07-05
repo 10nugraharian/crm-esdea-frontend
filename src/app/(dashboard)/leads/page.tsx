@@ -62,6 +62,10 @@ export default function LeadsPage() {
   const [formData, setFormData] = useState<Partial<Lead>>({});
   const [wilayahOptions, setWilayahOptions] = useState<{id: string, text: string}[]>([]);
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("Any");
+  const [ownerFilter, setOwnerFilter] = useState("Any");
+
   useEffect(() => {
     fetch('/wilayah.json')
       .then(res => res.json())
@@ -93,7 +97,10 @@ export default function LeadsPage() {
           body: JSON.stringify(formData),
         });
       } else {
-        // Edit logic if available
+        await fetchApi(`/leads/${formData.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(formData),
+        });
       }
       setIsCreateModalOpen(false);
       setIsEditModalOpen(false);
@@ -113,6 +120,53 @@ export default function LeadsPage() {
   const handleRemoveLegalitas = (id: number) => {
     setLegalitasList(legalitasList.filter(l => l.id !== id));
   };
+
+  const handleExport = () => {
+    if (leads.length === 0) return alert("Tidak ada data untuk diekspor");
+    const headers = ['ID', 'Perusahaan', 'PIC', 'Telepon', 'Status', 'Wilayah', 'Klasifikasi'];
+    const csvRows = [headers.join(",")];
+    leads.forEach(lead => {
+      const row = [
+        lead.id,
+        `"${lead.nama_perusahaan || ''}"`,
+        `"${lead.nama_pic || ''}"`,
+        `"${lead.no_telepon || ''}"`,
+        lead.status_leads,
+        `"${lead.wilayah || ''}"`,
+        `"${lead.sub_klasifikasi || ''}"`
+      ];
+      csvRows.push(row.join(","));
+    });
+    const csvContent = "data:text/csv;charset=utf-8," + csvRows.join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Export_Leads_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleDownloadTemplate = () => {
+    const headers = ['nama_perusahaan', 'jenis_perusahaan', 'status_leads', 'nama_pic', 'no_telepon', 'email'];
+    const csvContent = "data:text/csv;charset=utf-8," + headers.join(",");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "Template_Import_Leads.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const filteredLeads = leads.filter(lead => {
+    const matchesSearch = !searchQuery || 
+                          lead.nama_perusahaan?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          lead.nama_pic?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilter === "Any" || lead.status_leads === statusFilter;
+    const matchesOwner = ownerFilter === "Any" || (ownerFilter === "Me" ? true : false);
+    return matchesSearch && matchesStatus && matchesOwner;
+  });
 
   return (
     <div className="flex flex-col h-full bg-white rounded-tl-[16px] overflow-hidden">
@@ -147,7 +201,7 @@ export default function LeadsPage() {
             Import CSV
           </button>
           <button 
-            onClick={() => alert("Mengekspor data leads ke CSV...")}
+            onClick={handleExport}
             className="flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
           >
             <Download className="w-4 h-4 mr-2 text-gray-500" />
@@ -175,18 +229,33 @@ export default function LeadsPage() {
               <input 
                 type="text" 
                 placeholder="Search leads..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-8 pr-3 py-1 text-[13px] border border-gray-300 rounded bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500 focus:border-brand-500 w-56 transition-all"
               />
             </div>
             
             <div className="h-4 w-px bg-gray-300 mx-1"></div>
 
-            <button className="flex items-center px-3 py-1 text-[13px] font-medium text-gray-700 bg-white border border-gray-300 rounded-full hover:bg-gray-50 transition-colors">
-              Status: Any <ChevronDown className="w-3.5 h-3.5 ml-1 text-gray-400" />
-            </button>
-            <button className="flex items-center px-3 py-1 text-[13px] font-medium text-gray-700 bg-white border border-gray-300 rounded-full hover:bg-gray-50 transition-colors">
-              Owner: Me <ChevronDown className="w-3.5 h-3.5 ml-1 text-gray-400" />
-            </button>
+            <select 
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 py-1 text-[13px] font-medium text-gray-700 bg-white border border-gray-300 rounded-full hover:bg-gray-50 transition-colors focus:outline-none"
+            >
+              <option value="Any">Status: Any</option>
+              {KANBAN_COLUMNS.map(status => (
+                <option key={status} value={status}>{status}</option>
+              ))}
+            </select>
+            
+            <select 
+              value={ownerFilter}
+              onChange={(e) => setOwnerFilter(e.target.value)}
+              className="px-3 py-1 text-[13px] font-medium text-gray-700 bg-white border border-gray-300 rounded-full hover:bg-gray-50 transition-colors focus:outline-none"
+            >
+              <option value="Any">Owner: Any</option>
+              <option value="Me">Owner: Me</option>
+            </select>
             <button className="flex items-center px-3 py-1 text-[13px] font-medium text-brand-700 hover:bg-brand-50 rounded-full transition-colors">
               <Plus className="w-3.5 h-3.5 mr-1" /> Add filter
             </button>
@@ -225,7 +294,7 @@ export default function LeadsPage() {
               <tbody className="divide-y divide-gray-100 align-top">
                 {isLoading ? (
                   <tr><td colSpan={11} className="p-8 text-center text-gray-500">Loading leads...</td></tr>
-                ) : leads.map((lead) => (
+                ) : filteredLeads.map((lead) => (
                   <tr 
                     key={lead.id} 
                     className="hover:bg-brand-50/40 group transition-colors cursor-pointer"
@@ -279,7 +348,7 @@ export default function LeadsPage() {
           /* KANBAN VIEW */
           <div className="flex gap-4 h-full overflow-x-auto pb-6 items-start snap-x snap-mandatory scroll-smooth px-2 md:px-0 custom-scrollbar">
             {KANBAN_COLUMNS.map((colStatus) => {
-              const colLeads = leads.filter(l => l.status_leads === colStatus);
+              const colLeads = filteredLeads.filter(l => l.status_leads === colStatus);
               return (
                 <div key={colStatus} className="w-[85vw] sm:w-72 shrink-0 flex flex-col bg-[#F3F4F6] border border-gray-200 rounded-xl snap-center shadow-sm">
                   {/* Column Header */}
