@@ -67,6 +67,9 @@ export default function LeadsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("Any");
   const [ownerFilter, setOwnerFilter] = useState("Any");
+  const [dateFilter, setDateFilter] = useState("Any");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   useEffect(() => {
     fetch('/wilayah.json')
@@ -194,7 +197,37 @@ export default function LeadsPage() {
                           lead.nama_pic?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "Any" || lead.status_leads === statusFilter;
     const matchesOwner = ownerFilter === "Any" || (ownerFilter === "Me" ? true : false);
-    return matchesSearch && matchesStatus && matchesOwner;
+    
+    let matchesDate = true;
+    if (dateFilter !== "Any" && lead.created_at) {
+      const leadDate = new Date(lead.created_at);
+      const today = new Date();
+      
+      if (dateFilter === "Hari Ini") {
+        matchesDate = leadDate.toDateString() === today.toDateString();
+      } else if (dateFilter === "Minggu Ini") {
+        const firstDay = new Date(today);
+        firstDay.setDate(today.getDate() - today.getDay());
+        const lastDay = new Date(today);
+        lastDay.setDate(today.getDate() - today.getDay() + 6);
+        matchesDate = leadDate >= firstDay && leadDate <= lastDay;
+      } else if (dateFilter === "Bulan Ini") {
+        matchesDate = leadDate.getMonth() === today.getMonth() && leadDate.getFullYear() === today.getFullYear();
+      } else if (dateFilter === "Custom") {
+        if (startDate) {
+          const start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+          if (leadDate < start) matchesDate = false;
+        }
+        if (endDate) {
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          if (leadDate > end) matchesDate = false;
+        }
+      }
+    }
+
+    return matchesSearch && matchesStatus && matchesOwner && matchesDate;
   });
 
   return (
@@ -249,9 +282,8 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      {/* Advanced Filter Toolbar (HubSpot style) */}
-      {viewMode === "table" && (
-        <div className="flex flex-wrap items-center justify-between px-6 py-2.5 bg-white border-b border-gray-200 shrink-0 gap-3">
+      {/* Advanced Filter Toolbar (HubSpot style) - Now visible in both views */}
+      <div className="flex flex-wrap items-center justify-between px-6 py-2.5 bg-white border-b border-gray-200 shrink-0 gap-3">
           <div className="flex items-center gap-2">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
@@ -285,18 +317,49 @@ export default function LeadsPage() {
               <option value="Any">Owner: Any</option>
               <option value="Me">Owner: Me</option>
             </select>
+            <select 
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              className="px-3 py-1 text-[13px] font-medium text-gray-700 bg-white border border-gray-300 rounded-full hover:bg-gray-50 transition-colors focus:outline-none"
+            >
+              <option value="Any">Tanggal: Any</option>
+              <option value="Hari Ini">Hari Ini</option>
+              <option value="Minggu Ini">Minggu Ini</option>
+              <option value="Bulan Ini">Bulan Ini</option>
+              <option value="Custom">Rentang Tanggal</option>
+            </select>
+            
+            {dateFilter === "Custom" && (
+              <div className="flex items-center gap-1">
+                <input 
+                  type="date" 
+                  value={startDate} 
+                  onChange={e => setStartDate(e.target.value)}
+                  className="px-2 py-1 text-[13px] border border-gray-300 rounded focus:ring-brand-500 focus:border-brand-500"
+                />
+                <span className="text-gray-500 text-xs">-</span>
+                <input 
+                  type="date" 
+                  value={endDate} 
+                  onChange={e => setEndDate(e.target.value)}
+                  className="px-2 py-1 text-[13px] border border-gray-300 rounded focus:ring-brand-500 focus:border-brand-500"
+                />
+              </div>
+            )}
+
             <button className="flex items-center px-3 py-1 text-[13px] font-medium text-brand-700 hover:bg-brand-50 rounded-full transition-colors">
               <Plus className="w-3.5 h-3.5 mr-1" /> Add filter
             </button>
           </div>
 
           <div className="flex items-center gap-2 text-gray-500">
-            <button className="flex items-center px-2 py-1 text-[13px] font-medium hover:text-gray-900 transition-colors rounded hover:bg-gray-100">
-              <Columns className="w-3.5 h-3.5 mr-1.5" /> Columns
-            </button>
+            {viewMode === "table" && (
+              <button className="flex items-center px-2 py-1 text-[13px] font-medium hover:text-gray-900 transition-colors rounded hover:bg-gray-100">
+                <Columns className="w-3.5 h-3.5 mr-1.5" /> Columns
+              </button>
+            )}
           </div>
         </div>
-      )}
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-auto bg-gray-50 flex flex-col">
