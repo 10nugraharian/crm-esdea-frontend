@@ -21,6 +21,7 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
 
   if (!response.ok) {
     if (response.status === 401) {
+      alert(`Debug: 401 Unauthorized pada endpoint ${endpoint}. Token: ${token ? 'Ada' : 'Tidak Ada'}. Respons: ${JSON.stringify(data)}`);
       Cookies.remove('auth_token');
       Cookies.remove('user_data');
       if (typeof window !== 'undefined') {

@@ -54,7 +54,7 @@ export default function UsersPage() {
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const data = await fetchApi('/users');
+      const data = await fetchApi('/tim-users');
       setUsers(data);
     } catch (error) {
       console.error("Failed to load users", error);
@@ -67,12 +67,12 @@ export default function UsersPage() {
     try {
       setSaving(true);
       if (isAddModalOpen) {
-        await fetchApi('/users', {
+        await fetchApi('/tim-users', {
           method: 'POST',
           body: JSON.stringify(formData),
         });
       } else if (isEditModalOpen && formData.id) {
-        await fetchApi(`/users/${formData.id}`, {
+        await fetchApi(`/tim-users/${formData.id}`, {
           method: 'PUT',
           body: JSON.stringify(formData),
         });
@@ -91,7 +91,7 @@ export default function UsersPage() {
     if (!resettingUser) return;
     try {
       setSaving(true);
-      await fetchApi(`/users/${resettingUser.id}/reset-password`, {
+      await fetchApi(`/tim-users/${resettingUser.id}/reset-password`, {
         method: 'POST'
       });
       alert("Password berhasil di-reset ke default: esdea123");
