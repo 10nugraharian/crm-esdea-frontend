@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   ShieldAlert, 
   Save, 
@@ -10,6 +10,7 @@ import {
   Plus
 } from "lucide-react";
 import Modal from "@/components/Modal";
+import { fetchApi } from "@/lib/api";
 
 interface RoleAccess {
   id: string;
@@ -39,55 +40,35 @@ const modules = [
   "Hak Akses"
 ];
 
-const defaultRoles: RoleAccess[] = [
-  {
-    id: "R1",
-    role: "Admin (BOD)",
-    permissions: modules.reduce((acc, mod) => {
-      acc[mod] = { view: true, create: true, edit: true, delete: true };
-      return acc;
-    }, {} as RoleAccess["permissions"])
-  },
-  {
-    id: "R2",
-    role: "Manager",
-    permissions: modules.reduce((acc, mod) => {
-      acc[mod] = { view: true, create: true, edit: true, delete: false };
-      return acc;
-    }, {} as RoleAccess["permissions"])
-  },
-  {
-    id: "R3",
-    role: "Leader",
-    permissions: modules.reduce((acc, mod) => {
-      acc[mod] = { view: true, create: true, edit: true, delete: false };
-      return acc;
-    }, {} as RoleAccess["permissions"])
-  },
-  {
-    id: "R4",
-    role: "Sales",
-    permissions: modules.reduce((acc, mod) => {
-      const limited = ["Leads", "Quotations", "Dashboard", "Invoices"];
-      acc[mod] = { 
-        view: limited.includes(mod), 
-        create: limited.includes(mod), 
-        edit: limited.includes(mod), 
-        delete: false 
-      };
-      return acc;
-    }, {} as RoleAccess["permissions"])
-  },
-];
-
 export default function AksesPage() {
-  const [roles, setRoles] = useState<RoleAccess[]>(defaultRoles);
-  const [selectedRole, setSelectedRole] = useState<string>(defaultRoles[0].id);
+  const [roles, setRoles] = useState<RoleAccess[]>([]);
+  const [selectedRole, setSelectedRole] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isAddRoleModalOpen, setIsAddRoleModalOpen] = useState(false);
   const [newRoleName, setNewRoleName] = useState("");
 
   const activeRole = roles.find(r => r.id === selectedRole);
+
+  useEffect(() => {
+    fetchRoles();
+  }, []);
+
+  const fetchRoles = async () => {
+    setIsLoading(true);
+    try {
+      const data = await fetchApi('/roles');
+      setRoles(data);
+      if (data.length > 0 && !selectedRole) {
+        setSelectedRole(data[0].id);
+      }
+    } catch (error) {
+      console.error("Failed to fetch roles:", error);
+      alert("Gagal mengambil data role dari server.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const togglePermission = (mod: string, action: "view" | "create" | "edit" | "delete") => {
     setRoles(prev => prev.map(r => {
@@ -107,12 +88,52 @@ export default function AksesPage() {
     }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (!activeRole) return;
     setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
+    try {
+      await fetchApi(`/roles/${activeRole.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          permissions: activeRole.permissions
+        })
+      });
       alert("Pengaturan hak akses berhasil disimpan.");
-    }, 800);
+    } catch (error) {
+      console.error("Failed to save permissions:", error);
+      alert("Gagal menyimpan pengaturan hak akses.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCreateRole = async () => {
+    if (!newRoleName.trim()) return;
+    setIsSaving(true);
+    try {
+      const defaultPermissions = modules.reduce((acc, mod) => {
+        acc[mod] = { view: false, create: false, edit: false, delete: false };
+        return acc;
+      }, {} as RoleAccess["permissions"]);
+
+      const response = await fetchApi('/roles', {
+        method: 'POST',
+        body: JSON.stringify({
+          role: newRoleName,
+          permissions: defaultPermissions
+        })
+      });
+      
+      alert(`Role "${newRoleName}" berhasil ditambahkan.`);
+      setNewRoleName("");
+      setIsAddRoleModalOpen(false);
+      await fetchRoles(); // Refresh data
+    } catch (error) {
+      console.error("Failed to create role:", error);
+      alert("Gagal membuat role baru. Nama role mungkin sudah ada.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -126,7 +147,7 @@ export default function AksesPage() {
         <div className="flex items-center gap-3">
           <button 
             onClick={handleSave}
-            disabled={isSaving}
+            disabled={isSaving || !activeRole}
             className="flex items-center px-4 py-1.5 text-[13px] font-medium text-white bg-brand-700 border border-brand-700 rounded hover:bg-brand-800 transition-colors disabled:opacity-50"
           >
             {isSaving ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
@@ -149,20 +170,24 @@ export default function AksesPage() {
             </button>
           </div>
           <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            {roles.map(r => (
-              <button
-                key={r.id}
-                onClick={() => setSelectedRole(r.id)}
-                className={`w-full text-left px-3 py-2.5 rounded-md text-[13px] font-medium transition-colors flex items-center justify-between ${
-                  selectedRole === r.id 
-                    ? "bg-brand-50 text-brand-700" 
-                    : "text-gray-700 hover:bg-gray-100"
-                }`}
-              >
-                <span>{r.role}</span>
-                {selectedRole === r.id && <ShieldAlert className="w-3.5 h-3.5 text-brand-600" />}
-              </button>
-            ))}
+            {isLoading ? (
+              <div className="p-4 text-center text-sm text-gray-500">Memuat...</div>
+            ) : (
+              roles.map(r => (
+                <button
+                  key={r.id}
+                  onClick={() => setSelectedRole(r.id)}
+                  className={`w-full text-left px-3 py-2.5 rounded-md text-[13px] font-medium transition-colors flex items-center justify-between ${
+                    selectedRole === r.id 
+                      ? "bg-brand-50 text-brand-700" 
+                      : "text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  <span>{r.role}</span>
+                  {selectedRole === r.id && <ShieldAlert className="w-3.5 h-3.5 text-brand-600" />}
+                </button>
+              ))
+            )}
           </div>
         </div>
 
@@ -172,7 +197,7 @@ export default function AksesPage() {
             <div className="mb-4">
               <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
                 <ShieldAlert className="w-5 h-5 text-brand-600" />
-                Matriks Akses: {activeRole?.role}
+                Matriks Akses: {activeRole?.role || "Pilih Role"}
               </h2>
               <p className="text-sm text-gray-500 mt-1">Centang box di bawah untuk memberikan akses pada modul yang dipilih.</p>
             </div>
@@ -189,8 +214,8 @@ export default function AksesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {modules.map(mod => {
-                    const perm = activeRole?.permissions[mod];
+                  {activeRole ? modules.map(mod => {
+                    const perm = activeRole.permissions[mod];
                     if (!perm) return null;
                     return (
                       <tr key={mod} className="hover:bg-brand-50/20 transition-colors">
@@ -241,7 +266,13 @@ export default function AksesPage() {
                         </td>
                       </tr>
                     );
-                  })}
+                  }) : (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                        {isLoading ? "Memuat..." : "Silakan pilih role dari menu sebelah kiri."}
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -262,25 +293,11 @@ export default function AksesPage() {
               Batal
             </button>
             <button 
-              onClick={() => {
-                if (!newRoleName.trim()) return;
-                const newRole: RoleAccess = {
-                  id: `R${roles.length + 1}`,
-                  role: newRoleName,
-                  permissions: modules.reduce((acc, mod) => {
-                    acc[mod] = { view: false, create: false, edit: false, delete: false };
-                    return acc;
-                  }, {} as RoleAccess["permissions"])
-                };
-                setRoles([...roles, newRole]);
-                setNewRoleName("");
-                setSelectedRole(newRole.id);
-                setIsAddRoleModalOpen(false);
-                alert(`Role "${newRole.role}" berhasil ditambahkan.`);
-              }}
-              className="px-4 py-2 text-[13px] font-medium text-white bg-brand-700 rounded hover:bg-brand-800"
+              onClick={handleCreateRole}
+              disabled={isSaving || !newRoleName.trim()}
+              className="px-4 py-2 text-[13px] font-medium text-white bg-brand-700 rounded hover:bg-brand-800 disabled:opacity-50"
             >
-              Simpan Role
+              {isSaving ? "Menyimpan..." : "Simpan Role"}
             </button>
           </>
         }
