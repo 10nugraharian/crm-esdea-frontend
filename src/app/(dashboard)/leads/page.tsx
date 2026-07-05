@@ -388,7 +388,7 @@ export default function LeadsPage() {
                       <Edit2 className="w-4 h-4 mr-2" /> Edit Leads
                     </button>
                     <a 
-                      href={`https://wa.me/${formData.no_telepon?.replace(/^0/, '62')}?text=${encodeURIComponent(`Halo Bapak/Ibu ${formData.nama_pic || ''}, ini dengan manajemen dari PT Esdea Assistance Management. Terkait pengurusan legalitas perusahaan ${formData.nama_perusahaan || ''}, apakah ada yang bisa kami bantu lebih lanjut?\n\nSalam,\nRian`)}`}
+                      href={`https://wa.me/${formData.no_telepon?.replace(/^0/, '62')}?text=${encodeURIComponent(`🔔 [PENGINGAT MASA BERLAKU SBU]\n\nYth. Pimpinan di ${formData.nama_perusahaan || 'Perusahaan'}, Saya ${formData.sales?.name || 'Rian'} dari PT. Esdea Assistance Management, Mohon izin menginformasikan status SBU Anda di sistem LPJK:\n\n📄 SBU: ${formData.sub_klasifikasi || '-'}\n📅 Expired: ${formData.tanggal_expired || '-'} (15 Hari Lagi)\n\nTim PT. ESDEA Assistance Management siap men-support proses perpanjangan segera agar administrasi proyek dan portal OSS tidak terhambat.\n\nApakah saya boleh bantu siapkan estimasi biaya & estimasi waktu pengerjaannya?`)}`}
                       target="_blank"
                       rel="noreferrer"
                       className="flex items-center justify-center px-4 py-2 bg-[#25D366] text-white hover:bg-[#20b958] rounded-md text-[13px] font-medium transition-colors w-full shadow-sm"
