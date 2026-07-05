@@ -382,24 +382,30 @@ export default function UsersPage() {
           )}
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Role *</label>
-            <select className="w-full px-3 py-2 border border-gray-300 rounded text-[13px] focus:ring-brand-500 focus:border-brand-500" value={formData.role || ''} onChange={e => setFormData({...formData, role: e.target.value})}>
-              <option value="">Pilih Role...</option>
-              <option value="SALES">Sales</option>
-              <option value="LEADER">Sales Leader</option>
-              <option value="MANAGER">Sales Manager</option>
-              <option value="FINANCE">Finance</option>
-              <option value="BOD">Director / BOD</option>
-              <option value="ADMIN">Admin System</option>
-              <option value="SSO">SSO</option>
-            </select>
+            <div className="relative">
+              <select className="w-full px-3 py-2 text-[13px] text-gray-900 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 shadow-sm appearance-none cursor-pointer" value={formData.role || ''} onChange={e => setFormData({...formData, role: e.target.value})}>
+                <option value="">Pilih Role...</option>
+                <option value="SALES">Sales</option>
+                <option value="LEADER">Sales Leader</option>
+                <option value="MANAGER">Sales Manager</option>
+                <option value="FINANCE">Finance</option>
+                <option value="BOD">Director / BOD</option>
+                <option value="ADMIN">Admin System</option>
+                <option value="SSO">SSO</option>
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+            </div>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Gender</label>
-            <select className="w-full px-3 py-2 border border-gray-300 rounded text-[13px] focus:ring-brand-500 focus:border-brand-500" value={formData.gender || ''} onChange={e => setFormData({...formData, gender: (e.target.value as "Laki-laki" | "Perempuan" | "") || null})}>
-              <option value="">Tidak ditentukan</option>
-              <option value="Laki-laki">Laki-laki</option>
-              <option value="Perempuan">Perempuan</option>
-            </select>
+            <div className="relative">
+              <select className="w-full px-3 py-2 text-[13px] text-gray-900 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 shadow-sm appearance-none cursor-pointer" value={formData.gender || ''} onChange={e => setFormData({...formData, gender: (e.target.value as "Laki-laki" | "Perempuan" | "") || null})}>
+                <option value="">Tidak ditentukan</option>
+                <option value="Laki-laki">Laki-laki</option>
+                <option value="Perempuan">Perempuan</option>
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+            </div>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Tanggal Lahir</label>

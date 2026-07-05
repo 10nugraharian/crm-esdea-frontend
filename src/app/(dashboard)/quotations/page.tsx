@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Search, 
   Filter, 
@@ -17,49 +17,43 @@ import {
 import Link from "next/link";
 import CreateQuotationModal from "@/components/CreateQuotationModal";
 import Modal from "@/components/Modal";
+import { fetchApi } from "@/lib/api";
 
-type ApprovalStatus = "Approved" | "Pending Finance" | "Rejected" | "Proforma Invoice Issued";
-
-interface Quotation {
-  id: string;
-  no: number;
-  tanggalQuotation: string;
-  noQuotation: string;
-  namaPerusahaan: string;
-  summaryLayanan: string;
-  totalAmount: number;
-  statusApproval: ApprovalStatus;
-}
-
-const initialQuotations: Quotation[] = [
-  { 
-    id: "Q-001", no: 1, tanggalQuotation: "2026-06-28", noQuotation: "1045/Esdea/VI/2026", 
-    namaPerusahaan: "PT. Tambang Alpha", summaryLayanan: "Pengurusan SBU Jasa Konstruksi", 
-    totalAmount: 15000000, statusApproval: "Approved"
-  },
-  { 
-    id: "Q-002", no: 2, tanggalQuotation: "2026-06-29", noQuotation: "1046/Esdea/VI/2026", 
-    namaPerusahaan: "PT. Migas Beta", summaryLayanan: "ISO 9001 & 14001", 
-    totalAmount: 25000000, statusApproval: "Pending Finance"
-  }
-];
+type ApprovalStatus = "APPROVED" | "PENDING_FINANCE" | "REJECTED" | "PROFORMA_INVOICE_ISSUED";
 
 export default function QuotationsPage() {
-  const [quotations, setQuotations] = useState<Quotation[]>(initialQuotations);
+  const [quotations, setQuotations] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isRequestPIModalOpen, setIsRequestPIModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [selectedQuotation, setSelectedQuotation] = useState<Quotation | null>(null);
+  const [selectedQuotation, setSelectedQuotation] = useState<any | null>(null);
   
   // Modal State
   const [dpPercent, setDpPercent] = useState<string>("50");
   const bpPercent = 100 - (Number(dpPercent) || 0);
 
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetchApi('/quotations');
+      setQuotations(res.data || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
   const formatRupiah = (amount: number) => {
     return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(amount);
   };
 
-  const openRequestModal = (quotation: Quotation) => {
+  const openRequestModal = (quotation: any) => {
     setSelectedQuotation(quotation);
     setDpPercent("50");
     setIsRequestPIModalOpen(true);
@@ -69,13 +63,13 @@ export default function QuotationsPage() {
     if (!selectedQuotation) return;
     const dp = Number(dpPercent) || 0;
     
-    let newStatus: ApprovalStatus = "Proforma Invoice Issued";
+    let newStatus: ApprovalStatus = "PROFORMA_INVOICE_ISSUED";
     if (dp < 50) {
-      newStatus = "Pending Finance";
+      newStatus = "PENDING_FINANCE";
     }
 
     setQuotations(prev => prev.map(q => 
-      q.id === selectedQuotation.id ? { ...q, statusApproval: newStatus } : q
+      q.id === selectedQuotation.id ? { ...q, status_approval: newStatus } : q
     ));
     
     setIsRequestPIModalOpen(false);
@@ -92,7 +86,7 @@ export default function QuotationsPage() {
         <div className="flex items-center gap-3">
           <button 
             onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center px-4 py-1.5 text-[13px] font-medium text-white bg-brand-700 rounded hover:bg-brand-800 transition-colors"
+            className="flex items-center px-4 py-1.5 text-[13px] font-medium text-white bg-brand-700 rounded hover:bg-brand-800 transition-colors shadow-sm"
           >
             <Plus className="w-4 h-4 mr-2" />
             Buat Quotation
@@ -100,7 +94,7 @@ export default function QuotationsPage() {
         </div>
       </div>
 
-      {/* Advanced Filter Toolbar (HubSpot style) */}
+      {/* Advanced Filter Toolbar */}
       <div className="flex flex-wrap items-center justify-between px-6 py-2.5 bg-white border-b border-gray-200 shrink-0 gap-3">
         <div className="flex items-center gap-2">
           <div className="relative">
@@ -147,38 +141,45 @@ export default function QuotationsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 align-top">
-              {quotations.map((q) => (
-                <tr 
-                  key={q.id} 
-                  className="hover:bg-brand-50/40 group transition-colors cursor-pointer"
-                  onClick={(e) => {
-                    if ((e.target as HTMLElement).tagName !== 'INPUT' && (e.target as HTMLElement).tagName !== 'A') {
-                      setSelectedQuotation(q);
-                      setIsDetailModalOpen(true);
-                    }
-                  }}
-                >
-                  <td className="px-4 py-2.5 text-center align-middle">
-                    <input type="checkbox" className="rounded border-gray-300 text-brand-600 focus:ring-brand-500 opacity-50 group-hover:opacity-100" />
-                  </td>
-                  <td className="px-4 py-2.5 align-middle">{q.tanggalQuotation}</td>
-                  <td className="px-4 py-2.5 align-middle font-mono text-xs text-brand-600 font-medium">
-                    <Link href={`/quotations/preview/${q.id}`} className="hover:underline">{q.noQuotation}</Link>
-                  </td>
-                  <td className="px-4 py-2.5 align-middle font-medium text-gray-900">{q.namaPerusahaan}</td>
-                  <td className="px-4 py-2.5 align-middle max-w-[200px] truncate" title={q.summaryLayanan}>{q.summaryLayanan}</td>
-                  <td className="px-4 py-2.5 align-middle font-medium text-gray-900">{formatRupiah(q.totalAmount)}</td>
-                  <td className="px-4 py-2.5 align-middle">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium border
-                      ${q.statusApproval === 'Approved' ? 'bg-green-50 text-green-700 border-green-200' : 
-                        q.statusApproval === 'Pending Finance' ? 'bg-amber-50 text-amber-700 border-amber-200' : 
-                        q.statusApproval === 'Proforma Invoice Issued' ? 'bg-blue-50 text-blue-700 border-blue-200' : 
-                        'bg-red-50 text-red-700 border-red-200'}`}>
-                      {q.statusApproval}
-                    </span>
-                  </td>
-                </tr>
-              ))}
+              {isLoading ? (
+                <tr><td colSpan={7} className="p-8 text-center text-gray-500">Loading data...</td></tr>
+              ) : quotations.length === 0 ? (
+                <tr><td colSpan={7} className="p-8 text-center text-gray-500">Belum ada quotation.</td></tr>
+              ) : quotations.map((q) => {
+                const summaryLayanan = q.items?.map((i: any) => i.layanan?.nama_layanan).join(', ') || '-';
+                return (
+                  <tr 
+                    key={q.id} 
+                    className="hover:bg-brand-50/40 group transition-colors cursor-pointer"
+                    onClick={(e) => {
+                      if ((e.target as HTMLElement).tagName !== 'INPUT' && (e.target as HTMLElement).tagName !== 'A') {
+                        setSelectedQuotation({ ...q, summaryLayanan });
+                        setIsDetailModalOpen(true);
+                      }
+                    }}
+                  >
+                    <td className="px-4 py-2.5 text-center align-middle">
+                      <input type="checkbox" className="rounded border-gray-300 text-brand-600 focus:ring-brand-500 opacity-50 group-hover:opacity-100" />
+                    </td>
+                    <td className="px-4 py-2.5 align-middle">{new Date(q.created_at).toLocaleDateString('id-ID')}</td>
+                    <td className="px-4 py-2.5 align-middle font-mono text-xs text-brand-600 font-medium">
+                      <Link href={`/quotations/preview/${q.id}`} className="hover:underline">{q.no_quotation}</Link>
+                    </td>
+                    <td className="px-4 py-2.5 align-middle font-medium text-gray-900">{q.lead?.nama_perusahaan}</td>
+                    <td className="px-4 py-2.5 align-middle max-w-[200px] truncate" title={summaryLayanan}>{summaryLayanan}</td>
+                    <td className="px-4 py-2.5 align-middle font-medium text-gray-900">{formatRupiah(q.total_amount)}</td>
+                    <td className="px-4 py-2.5 align-middle">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium border
+                        ${q.status_approval === 'APPROVED' ? 'bg-green-50 text-green-700 border-green-200' : 
+                          q.status_approval === 'PENDING_FINANCE' ? 'bg-amber-50 text-amber-700 border-amber-200' : 
+                          q.status_approval === 'PROFORMA_INVOICE_ISSUED' ? 'bg-blue-50 text-blue-700 border-blue-200' : 
+                          'bg-red-50 text-red-700 border-red-200'}`}>
+                        {q.status_approval.replace('_', ' ')}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -203,14 +204,14 @@ export default function QuotationsPage() {
           <div className="p-2 text-[13px] text-gray-700">
               <div className="mb-6 flex items-center justify-between">
                 <div>
-                  <div className="text-xs text-brand-600 font-mono font-medium">{selectedQuotation.noQuotation}</div>
-                  <h3 className="text-xl font-bold text-gray-900 mt-1">{selectedQuotation.namaPerusahaan}</h3>
+                  <div className="text-xs text-brand-600 font-mono font-medium">{selectedQuotation.no_quotation}</div>
+                  <h3 className="text-xl font-bold text-gray-900 mt-1">{selectedQuotation.lead?.nama_perusahaan}</h3>
                   <span className={`inline-flex items-center px-2 py-0.5 mt-2 rounded text-[11px] font-medium border
-                    ${selectedQuotation.statusApproval === 'Approved' ? 'bg-green-50 text-green-700 border-green-200' : 
-                      selectedQuotation.statusApproval === 'Pending Finance' ? 'bg-amber-50 text-amber-700 border-amber-200' : 
-                      selectedQuotation.statusApproval === 'Proforma Invoice Issued' ? 'bg-blue-50 text-blue-700 border-blue-200' : 
+                    ${selectedQuotation.status_approval === 'APPROVED' ? 'bg-green-50 text-green-700 border-green-200' : 
+                      selectedQuotation.status_approval === 'PENDING_FINANCE' ? 'bg-amber-50 text-amber-700 border-amber-200' : 
+                      selectedQuotation.status_approval === 'PROFORMA_INVOICE_ISSUED' ? 'bg-blue-50 text-blue-700 border-blue-200' : 
                       'bg-red-50 text-red-700 border-red-200'}`}>
-                    {selectedQuotation.statusApproval}
+                    {selectedQuotation.status_approval.replace('_', ' ')}
                   </span>
                 </div>
                 <div className="flex flex-col gap-2">
@@ -220,12 +221,13 @@ export default function QuotationsPage() {
                   >
                     <FileText className="w-3.5 h-3.5 mr-1.5" /> Preview PDF
                   </Link>
-                  <Link 
-                    href={`/quotations/preview/${selectedQuotation.id}`} 
+                  <a 
+                    href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/quotations/${selectedQuotation.id}/pdf`}
+                    target="_blank"
                     className="flex items-center justify-center px-3 py-1.5 bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-300 rounded text-[13px] font-medium transition-colors"
                   >
                     <Download className="w-3.5 h-3.5 mr-1.5" /> Download
-                  </Link>
+                  </a>
                 </div>
               </div>
 
@@ -235,11 +237,11 @@ export default function QuotationsPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <div className="text-xs text-gray-500">Tanggal Quotation</div>
-                      <div className="font-medium text-gray-900">{selectedQuotation.tanggalQuotation}</div>
+                      <div className="font-medium text-gray-900">{new Date(selectedQuotation.created_at).toLocaleDateString('id-ID')}</div>
                     </div>
                     <div>
                       <div className="text-xs text-gray-500">Total Biaya</div>
-                      <div className="font-bold text-gray-900">{formatRupiah(selectedQuotation.totalAmount)}</div>
+                      <div className="font-bold text-gray-900">{formatRupiah(selectedQuotation.total_amount)}</div>
                     </div>
                     <div className="col-span-2">
                       <div className="text-xs text-gray-500">Summary Layanan</div>
@@ -249,7 +251,7 @@ export default function QuotationsPage() {
                 </div>
 
                 <div className="border-t border-gray-100 pt-4 mt-6">
-                  {selectedQuotation.statusApproval === "Approved" ? (
+                  {selectedQuotation.status_approval === "APPROVED" ? (
                     <button 
                       onClick={() => openRequestModal(selectedQuotation)}
                       className="w-full flex justify-center items-center px-4 py-2 text-[13px] font-medium text-white bg-green-600 rounded hover:bg-green-700 transition-colors shadow-sm"
@@ -293,8 +295,8 @@ export default function QuotationsPage() {
         {selectedQuotation && (
           <div className="p-2">
               <div className="mb-4 bg-gray-50 p-3 rounded border border-gray-200 text-sm">
-                <p><span className="text-gray-500">Perusahaan:</span> <span className="font-medium text-gray-800">{selectedQuotation.namaPerusahaan}</span></p>
-                <p><span className="text-gray-500">Total:</span> <span className="font-medium text-gray-800">{formatRupiah(selectedQuotation.totalAmount)}</span></p>
+                <p><span className="text-gray-500">Perusahaan:</span> <span className="font-medium text-gray-800">{selectedQuotation.lead?.nama_perusahaan}</span></p>
+                <p><span className="text-gray-500">Total:</span> <span className="font-medium text-gray-800">{formatRupiah(selectedQuotation.total_amount)}</span></p>
               </div>
 
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -340,25 +342,12 @@ export default function QuotationsPage() {
           </div>
         )}
       </Modal>
+
       {/* MODAL CREATE QUOTATION */}
       <CreateQuotationModal 
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        onSave={() => {
-          const newQ: Quotation = {
-            id: `Q-00${quotations.length + 1}`,
-            no: quotations.length + 1,
-            tanggalQuotation: new Date().toISOString().split('T')[0],
-            noQuotation: `104${quotations.length + 5}/Esdea/VI/2026`,
-            namaPerusahaan: "Perusahaan Baru",
-            summaryLayanan: "Layanan Baru (Auto-generated)",
-            totalAmount: 12500000,
-            statusApproval: "Approved"
-          };
-          setQuotations([newQ, ...quotations]);
-          alert("Quotation berhasil dibuat!");
-          setIsCreateModalOpen(false);
-        }}
+        onSave={() => loadData()}
       />
     </div>
   );
