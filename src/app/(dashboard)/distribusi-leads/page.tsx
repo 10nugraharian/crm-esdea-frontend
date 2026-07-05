@@ -48,7 +48,7 @@ export default function DistribusiLeadsPage() {
       ]);
       setLeads(resLeads.data || []);
       const usersArray = Array.isArray(resUsers) ? resUsers : (resUsers.data || []);
-      setSalesList(usersArray.filter((u: any) => u.role === 'SALES'));
+      setSalesList(usersArray.filter((u: any) => u.role && u.role.toUpperCase() === 'SALES'));
     } catch (e) {
       console.error(e);
     } finally {
