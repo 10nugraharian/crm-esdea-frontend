@@ -1,42 +1,18 @@
 "use client";
 
-import React, { use } from "react";
+import React, { use, useState, useEffect } from "react";
 import { Printer, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { fetchApi } from "@/lib/api";
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-// Roman numeral converter for months
-function toRoman(num: number): string {
-  const romanNumerals: [number, string][] = [
-    [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"]
-  ];
-  let result = "";
-  for (const [value, symbol] of romanNumerals) {
-    while (num >= value) {
-      result += symbol;
-      num -= value;
-    }
-  }
-  return result;
-}
-
-// Auto-generate quotation number: {counter}/Esdea/{roman_month}/{year}
-// Counter resets every month, roman numeral = current month
-function generateQuotationNumber(sequenceNumber: number): string {
-  const now = new Date();
-  const month = now.getMonth() + 1; // 1-12
-  const year = now.getFullYear();
-  const romanMonth = toRoman(month);
-  const paddedSeq = String(sequenceNumber).padStart(4, "0");
-  return `${paddedSeq}/Esdea/${romanMonth}/${year}`;
-}
-
 // Format date in Indonesian
-function formatTanggalIndonesia(date: Date): string {
+function formatTanggalIndonesia(dateString: string): string {
+  const date = new Date(dateString);
   const bulan = [
     "Januari", "Februari", "Maret", "April", "Mei", "Juni",
     "Juli", "Agustus", "September", "Oktober", "November", "Desember"
@@ -44,11 +20,11 @@ function formatTanggalIndonesia(date: Date): string {
   return `${date.getDate()} ${bulan[date.getMonth()]} ${date.getFullYear()}`;
 }
 
-// Calculate validity date (14 days from now)
-function getValidityDate(): string {
-  const d = new Date();
+// Calculate validity date (14 days from given date)
+function getValidityDate(dateString: string): string {
+  const d = new Date(dateString);
   d.setDate(d.getDate() + 14);
-  return formatTanggalIndonesia(d);
+  return formatTanggalIndonesia(d.toISOString());
 }
 
 function PageHeader() {
@@ -69,48 +45,36 @@ function PageFooter() {
 
 export default function QuotationPreviewPage(props: PageProps) {
   const params = use(props.params);
-  const isQ1 = params.id === "Q-001";
+  
+  const [quotation, setQuotation] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const now = new Date();
-  const tanggalSekarang = formatTanggalIndonesia(now);
-  const tanggalBerlaku = getValidityDate();
-
-  const quotationData = {
-    tanggal: tanggalSekarang,
-    noSurat: generateQuotationNumber(isQ1 ? 1045 : 1046),
-    namaPerusahaan: isQ1 ? "PT. Tambang Alpha" : "PT. Migas Beta",
-    namaPic: "Rian Nugraha",
-    noTelpPic: isQ1 ? "081234567890" : "089876543210",
-    sales: "Budi Sales",
-    items: [
-      {
-        nama_produk: isQ1 ? "Pengurusan SBU Jasa Konstruksi" : "ISO 9001 & 14001",
-        keterangan: "Sertifikasi Badan Usaha & Pendampingan",
-        qty: 1,
-        harga_jual: isQ1 ? 15000000 : 25000000,
-        sub_total: isQ1 ? 15000000 : 25000000
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        const res = await fetchApi(`/quotations/${params.id}`);
+        // API returns { data: ... } or just the object depending on show vs index
+        setQuotation(res.data || res);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
       }
-    ],
-    total: isQ1 ? 15000000 : 25000000,
-    diskon: 0,
-    grand_total: isQ1 ? 15000000 : 25000000
-  };
+    };
+    loadData();
+  }, [params.id]);
 
   const formatRupiah = (amount: number) => {
     return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(amount);
   };
 
-    const downloadPdfServer = async () => {
+  const downloadPdfServer = async () => {
     try {
-      if (isQ1) {
-        // Untuk data demo/dummy, jalankan print browser biasa
-        window.print();
-        return;
-      }
-      
       const Cookies = (await import('js-cookie')).default;
       const token = Cookies.get('auth_token');
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
       const res = await fetch(`${baseUrl}/quotations/${params.id}/pdf`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -123,7 +87,7 @@ export default function QuotationPreviewPage(props: PageProps) {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Quotation-${params.id}.pdf`;
+      a.download = `Quotation-${quotation?.no_quotation || params.id}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -133,6 +97,18 @@ export default function QuotationPreviewPage(props: PageProps) {
       alert('Gagal mengunduh PDF dari server.');
     }
   };
+
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center bg-gray-100">Memuat data...</div>;
+  }
+
+  if (error || !quotation) {
+    return <div className="min-h-screen flex items-center justify-center bg-gray-100 text-red-600">Error: {error || 'Data tidak ditemukan'}</div>;
+  }
+
+  const tanggalSekarang = formatTanggalIndonesia(quotation.created_at);
+  const tanggalBerlaku = getValidityDate(quotation.created_at);
+  const totalAmount = parseFloat(quotation.total_amount) || 0;
 
   return (
     <div className="min-h-screen bg-gray-300 py-8 print:py-0 print:bg-white font-[Tahoma] text-[12px] text-gray-900">
@@ -164,22 +140,22 @@ export default function QuotationPreviewPage(props: PageProps) {
 
           <h2 className="text-base font-bold text-center underline mb-6">Quotation Letter</h2>
 
-          <div className="text-[12px] leading-relaxed mb-1 text-right">{quotationData.tanggal}</div>
+          <div className="text-[12px] leading-relaxed mb-1 text-right">{tanggalSekarang}</div>
 
           <table className="text-[12px] leading-relaxed mb-4">
             <tbody>
-              <tr><td className="pr-2 align-top">No</td><td className="pr-2 align-top">:</td><td>{quotationData.noSurat}</td></tr>
+              <tr><td className="pr-2 align-top">No</td><td className="pr-2 align-top">:</td><td>{quotation.no_quotation}</td></tr>
               <tr><td className="pr-2 align-top">Lamp</td><td className="pr-2 align-top">:</td><td>3 (tiga) halaman</td></tr>
               <tr><td className="pr-2 align-top">Hal</td><td className="pr-2 align-top">:</td><td>Penawaran Legalitas Perusahaan</td></tr>
               <tr><td className="pr-2 align-top">Rev</td><td className="pr-2 align-top">:</td><td>01</td></tr>
-              <tr><td className="pr-2 align-top">Sales</td><td className="pr-2 align-top">:</td><td>{quotationData.sales}</td></tr>
+              <tr><td className="pr-2 align-top">Sales</td><td className="pr-2 align-top">:</td><td>{quotation.sales?.nama_lengkap || '-'}</td></tr>
             </tbody>
           </table>
 
           <div className="text-[12px] mb-4 leading-relaxed">
             <p>Kepada Yth,</p>
-            <p className="font-bold">{quotationData.namaPerusahaan}</p>
-            <p>Up. {quotationData.namaPic} - {quotationData.noTelpPic}</p>
+            <p className="font-bold">{quotation.lead?.nama_perusahaan}</p>
+            <p>Up. {quotation.lead?.nama_pic || '-'} {quotation.lead?.no_wa ? `- ${quotation.lead.no_wa}` : ''}</p>
           </div>
 
           <div className="text-[12px] mb-3 leading-relaxed text-justify">
@@ -194,45 +170,47 @@ export default function QuotationPreviewPage(props: PageProps) {
               <tr className="bg-gray-100 font-bold text-center">
                 <th className="border border-gray-700 py-1.5 w-8">No</th>
                 <th className="border border-gray-700 py-1.5">Item</th>
-                <th className="border border-gray-700 py-1.5">Keterangan</th>
                 <th className="border border-gray-700 py-1.5 w-10">QTY</th>
                 <th className="border border-gray-700 py-1.5 w-28">Harga</th>
                 <th className="border border-gray-700 py-1.5 w-28">Sub Total</th>
               </tr>
             </thead>
             <tbody>
-              {quotationData.items.map((item, idx) => (
-                <tr key={idx}>
-                  <td className="border border-gray-700 py-1.5 text-center">{idx + 1}</td>
-                  <td className="border border-gray-700 py-1.5 px-2">{item.nama_produk}</td>
-                  <td className="border border-gray-700 py-1.5 px-2 text-[11px]">{item.keterangan}</td>
-                  <td className="border border-gray-700 py-1.5 text-center">{item.qty}</td>
-                  <td className="border border-gray-700 py-1.5 px-2 text-right">{formatRupiah(item.harga_jual)}</td>
-                  <td className="border border-gray-700 py-1.5 px-2 text-right">{formatRupiah(item.sub_total)}</td>
-                </tr>
-              ))}
+              {quotation.items?.map((item: any, idx: number) => {
+                const harga = parseFloat(item.harga_jual_input);
+                const qty = parseInt(item.qty);
+                const subTotal = harga * qty;
+                return (
+                  <tr key={idx}>
+                    <td className="border border-gray-700 py-1.5 text-center">{idx + 1}</td>
+                    <td className="border border-gray-700 py-1.5 px-2">{item.layanan?.nama_layanan}</td>
+                    <td className="border border-gray-700 py-1.5 text-center">{qty}</td>
+                    <td className="border border-gray-700 py-1.5 px-2 text-right">{formatRupiah(harga)}</td>
+                    <td className="border border-gray-700 py-1.5 px-2 text-right">{formatRupiah(subTotal)}</td>
+                  </tr>
+                );
+              })}
               {/* Empty rows */}
-              {[...Array(Math.max(0, 5 - quotationData.items.length))].map((_, i) => (
+              {[...Array(Math.max(0, 5 - (quotation.items?.length || 0)))].map((_, i) => (
                 <tr key={`empty-${i}`}>
                   <td className="border border-gray-700 py-3"></td>
                   <td className="border border-gray-700"></td>
                   <td className="border border-gray-700"></td>
                   <td className="border border-gray-700"></td>
                   <td className="border border-gray-700"></td>
-                  <td className="border border-gray-700"></td>
                 </tr>
               ))}
               <tr className="font-bold">
-                <td colSpan={5} className="border border-gray-700 py-1.5 px-2 text-right">Total</td>
-                <td className="border border-gray-700 py-1.5 px-2 text-right">{formatRupiah(quotationData.total)}</td>
+                <td colSpan={4} className="border border-gray-700 py-1.5 px-2 text-right">Total</td>
+                <td className="border border-gray-700 py-1.5 px-2 text-right">{formatRupiah(totalAmount)}</td>
               </tr>
               <tr className="font-bold">
-                <td colSpan={5} className="border border-gray-700 py-1.5 px-2 text-right">Diskon</td>
-                <td className="border border-gray-700 py-1.5 px-2 text-right">{formatRupiah(quotationData.diskon)}</td>
+                <td colSpan={4} className="border border-gray-700 py-1.5 px-2 text-right">Diskon</td>
+                <td className="border border-gray-700 py-1.5 px-2 text-right">{formatRupiah(0)}</td>
               </tr>
               <tr className="font-bold bg-gray-100">
-                <td colSpan={5} className="border border-gray-700 py-1.5 px-2 text-right">Grand Total</td>
-                <td className="border border-gray-700 py-1.5 px-2 text-right">{formatRupiah(quotationData.grand_total)}</td>
+                <td colSpan={4} className="border border-gray-700 py-1.5 px-2 text-right">Grand Total</td>
+                <td className="border border-gray-700 py-1.5 px-2 text-right">{formatRupiah(totalAmount)}</td>
               </tr>
             </tbody>
           </table>
@@ -240,7 +218,7 @@ export default function QuotationPreviewPage(props: PageProps) {
           <p className="text-[12px] font-bold italic text-center mb-3">(Penawaran ini hanya berlaku selama 14 hari sampai dengan {tanggalBerlaku})</p>
           <p className="text-[12px] text-justify mb-4">Demikian hal ini Kami sampaikan dan atas perhatiannya serta kesempatan yang telah diberikan, Kami ucapkan terimakasih.</p>
 
-          <p className="text-[12px] mb-6">Bekasi, {quotationData.tanggal}</p>
+          <p className="text-[12px] mb-6">Bekasi, {tanggalSekarang}</p>
 
           {/* Dual Signature Block */}
           <div className="flex justify-between text-[12px] mb-4">
@@ -259,7 +237,7 @@ export default function QuotationPreviewPage(props: PageProps) {
               <div className="h-[80px] flex items-center justify-center">
                 {/* Blank space for client signature */}
               </div>
-              <p className="font-bold border-b border-gray-800 pb-1 inline-block">{quotationData.namaPerusahaan}</p>
+              <p className="font-bold border-b border-gray-800 pb-1 inline-block">{quotation.lead?.nama_perusahaan}</p>
             </div>
           </div>
 
