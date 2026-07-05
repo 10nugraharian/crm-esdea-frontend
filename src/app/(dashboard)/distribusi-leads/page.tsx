@@ -47,7 +47,8 @@ export default function DistribusiLeadsPage() {
         fetchApi('/tim-users')
       ]);
       setLeads(resLeads.data || []);
-      setSalesList((resUsers.data || []).filter((u: any) => u.role === 'SALES'));
+      const usersArray = Array.isArray(resUsers) ? resUsers : (resUsers.data || []);
+      setSalesList(usersArray.filter((u: any) => u.role === 'SALES'));
     } catch (e) {
       console.error(e);
     } finally {
