@@ -133,7 +133,7 @@ export default function DistribusiLeadsPage() {
         method: 'POST',
         body: JSON.stringify({ lead_ids: selectedLeads, sales_id: selectedSales })
       });
-      alert(`Berhasil assign ${selectedLeads.length} leads ke ${salesList.find(s => s.id === selectedSales)?.name}`);
+      alert(`Berhasil assign ${selectedLeads.length} leads ke ${salesList.find(s => s.id === selectedSales)?.namaLengkap}`);
       setSelectedLeads([]);
       setIsAssignModalOpen(false);
       loadData();
@@ -482,7 +482,7 @@ export default function DistribusiLeadsPage() {
             >
               <option value="" disabled>-- Pilih Sales --</option>
               {salesList.map(s => (
-                <option key={s.id} value={s.id}>{s.name}</option>
+                <option key={s.id} value={s.id}>{s.namaLengkap}</option>
               ))}
             </select>
           </div>
