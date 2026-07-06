@@ -29,6 +29,13 @@ export default function QuotationsPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedQuotation, setSelectedQuotation] = useState<any | null>(null);
   
+  // Filter State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("Any");
+  const [dateFilter, setDateFilter] = useState("Any");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  
   // Modal State
   const [dpPercent, setDpPercent] = useState<string>("50");
   const bpPercent = 100 - (Number(dpPercent) || 0);
@@ -59,22 +66,65 @@ export default function QuotationsPage() {
     setIsRequestPIModalOpen(true);
   };
 
-  const handleRequestProforma = () => {
+  const handleRequestProforma = async () => {
     if (!selectedQuotation) return;
     const dp = Number(dpPercent) || 0;
     
-    let newStatus: ApprovalStatus = "PROFORMA_INVOICE_ISSUED";
-    if (dp < 50) {
-      newStatus = "PENDING_FINANCE";
+    try {
+      await fetchApi('/invoices', {
+        method: 'POST',
+        body: JSON.stringify({
+          quotation_id: selectedQuotation.id,
+          persentase_dp: dp
+        })
+      });
+      setIsRequestPIModalOpen(false);
+      setIsDetailModalOpen(false);
+      loadData();
+      alert("Request Proforma Invoice berhasil diajukan.");
+    } catch (e: any) {
+      alert("Gagal mengajukan proforma invoice: " + (e.message || "Kesalahan API"));
+    }
+  };
+
+  const filteredQuotations = quotations.filter(q => {
+    const matchesSearch = !searchQuery || 
+                          q.lead?.nama_perusahaan?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          q.no_quotation?.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesStatus = statusFilter === "Any" || q.status_approval === statusFilter;
+    
+    let matchesDate = true;
+    if (dateFilter !== "Any" && q.created_at) {
+      const qDate = new Date(q.created_at);
+      const today = new Date();
+      
+      if (dateFilter === "Hari Ini") {
+        matchesDate = qDate.toDateString() === today.toDateString();
+      } else if (dateFilter === "Minggu Ini") {
+        const firstDay = new Date(today);
+        firstDay.setDate(today.getDate() - today.getDay());
+        const lastDay = new Date(today);
+        lastDay.setDate(today.getDate() - today.getDay() + 6);
+        matchesDate = qDate >= firstDay && qDate <= lastDay;
+      } else if (dateFilter === "Bulan Ini") {
+        matchesDate = qDate.getMonth() === today.getMonth() && qDate.getFullYear() === today.getFullYear();
+      } else if (dateFilter === "Custom") {
+        if (startDate) {
+          const start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+          if (qDate < start) matchesDate = false;
+        }
+        if (endDate) {
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          if (qDate > end) matchesDate = false;
+        }
+      }
     }
 
-    setQuotations(prev => prev.map(q => 
-      q.id === selectedQuotation.id ? { ...q, status_approval: newStatus } : q
-    ));
-    
-    setIsRequestPIModalOpen(false);
-    setIsDetailModalOpen(false);
-  };
+    return matchesSearch && matchesStatus && matchesDate;
+  });
 
   return (
     <div className="flex flex-col h-full bg-white rounded-tl-[16px] overflow-hidden">
@@ -102,18 +152,41 @@ export default function QuotationsPage() {
             <input 
               type="text" 
               placeholder="Search quotations..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-8 pr-3 py-1 text-[13px] border border-gray-300 rounded bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500 focus:border-brand-500 w-56 transition-all"
             />
           </div>
           
           <div className="h-4 w-px bg-gray-300 mx-1"></div>
 
-          <button className="flex items-center px-3 py-1 text-[13px] font-medium text-gray-700 bg-white border border-gray-300 rounded-full hover:bg-gray-50 transition-colors">
-            Status: Any <ChevronDown className="w-3.5 h-3.5 ml-1 text-gray-400" />
-          </button>
-          <button className="flex items-center px-3 py-1 text-[13px] font-medium text-brand-700 hover:bg-brand-50 rounded-full transition-colors">
-            <Plus className="w-3.5 h-3.5 mr-1" /> Add filter
-          </button>
+          <div className="relative group">
+            <button className="flex items-center px-3 py-1 text-[13px] font-medium text-gray-700 bg-white border border-gray-300 rounded-full hover:bg-gray-50 transition-colors">
+              Tanggal: {dateFilter} <ChevronDown className="w-3.5 h-3.5 ml-1 text-gray-400" />
+            </button>
+            <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg py-1 z-50 hidden group-hover:block">
+              {['Any', 'Hari Ini', 'Minggu Ini', 'Bulan Ini', 'Custom'].map(opt => (
+                <button key={opt} onClick={() => setDateFilter(opt)} className="block w-full text-left px-4 py-1.5 text-[13px] hover:bg-gray-50">{opt}</button>
+              ))}
+              {dateFilter === "Custom" && (
+                <div className="px-3 py-2 border-t border-gray-100 mt-1">
+                  <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full text-xs mb-1 border-gray-300 rounded" />
+                  <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full text-xs border-gray-300 rounded" />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="relative group">
+            <button className="flex items-center px-3 py-1 text-[13px] font-medium text-gray-700 bg-white border border-gray-300 rounded-full hover:bg-gray-50 transition-colors">
+              Status: {statusFilter.replace('_', ' ')} <ChevronDown className="w-3.5 h-3.5 ml-1 text-gray-400" />
+            </button>
+            <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg py-1 z-50 hidden group-hover:block">
+              {['Any', 'PENDING_FINANCE', 'APPROVED', 'REJECTED', 'PROFORMA_INVOICE_ISSUED'].map(opt => (
+                <button key={opt} onClick={() => setStatusFilter(opt)} className="block w-full text-left px-4 py-1.5 text-[13px] hover:bg-gray-50">{opt.replace('_', ' ')}</button>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className="flex items-center gap-2 text-gray-500">
@@ -143,9 +216,9 @@ export default function QuotationsPage() {
             <tbody className="divide-y divide-gray-100 align-top">
               {isLoading ? (
                 <tr><td colSpan={7} className="p-8 text-center text-gray-500">Loading data...</td></tr>
-              ) : quotations.length === 0 ? (
-                <tr><td colSpan={7} className="p-8 text-center text-gray-500">Belum ada quotation.</td></tr>
-              ) : quotations.map((q) => {
+              ) : filteredQuotations.length === 0 ? (
+                <tr><td colSpan={7} className="p-8 text-center text-gray-500">Belum ada quotation atau tidak ada yang sesuai filter.</td></tr>
+              ) : filteredQuotations.map((q) => {
                 const summaryLayanan = q.items?.map((i: any) => i.layanan?.nama_layanan).join(', ') || '-';
                 return (
                   <tr 
