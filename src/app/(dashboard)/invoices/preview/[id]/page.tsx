@@ -222,9 +222,9 @@ export default function InvoicePreviewPage(props: PageProps) {
                   A/n PT Esdea Assistance Management
                 </div>
                 <div className="font-bold p-3 border border-gray-300 bg-gray-50 rounded-sm w-[200px]">
-                  Bank BCA<br/>
-                  No. Rekening : 0663456789<br/>
-                  A/n PT Esdea Assistance Management
+                  Bank Central Asia<br/>
+                  No. Rekening : 6755907760<br/>
+                  A/n Donny Ruswandi (Direktur)
                 </div>
               </div>
             </div>
