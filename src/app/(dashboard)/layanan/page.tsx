@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Search,
   Filter,
@@ -16,10 +16,11 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import Modal from "@/components/Modal";
+import { fetchApi } from "@/lib/api";
 
 interface Layanan {
   id: string;
-  no: number;
+  no?: number;
   layananId: string;
   namaLayanan: string;
   kategori: string;
@@ -30,34 +31,17 @@ interface Layanan {
   komisiSales: number;
   komisiLeader: number;
   komisiManager: number;
-  komisiSso: number; // Fix 50.000 per leads close won dari SSO
+  komisiSso: number;
 }
 
-const dummyLayanan: Layanan[] = [
-  { id: "1", no: 1, layananId: "LY-001", namaLayanan: "SKK - JENJANG 9", kategori: "General", keterangan: "SKK & KTA Asosiasi", hargaModal: 0, margin: 0, hargaPokok: 5800000, komisiSales: 351360, komisiLeader: 109800, komisiManager: 32940, komisiSso: 50000 },
-  { id: "2", no: 2, layananId: "LY-002", namaLayanan: "SKK - JENJANG 8", kategori: "General", keterangan: "SKK & KTA Asosiasi", hargaModal: 0, margin: 0, hargaPokok: 3800000, komisiSales: 172800, komisiLeader: 54000, komisiManager: 16200, komisiSso: 50000 },
-  { id: "3", no: 3, layananId: "LY-003", namaLayanan: "SKK - JENJANG 7", kategori: "General", keterangan: "SKK & KTA Asosiasi", hargaModal: 0, margin: 0, hargaPokok: 2800000, komisiSales: 184640, komisiLeader: 57700, komisiManager: 17310, komisiSso: 50000 },
-  { id: "4", no: 4, layananId: "LY-004", namaLayanan: "SKK - JENJANG 6", kategori: "General", keterangan: "SKK & KTA Asosiasi", hargaModal: 0, margin: 0, hargaPokok: 1800000, komisiSales: 124800, komisiLeader: 39000, komisiManager: 11700, komisiSso: 50000 },
-  { id: "5", no: 5, layananId: "LY-005", namaLayanan: "SKK - JENJANG 5", kategori: "General", keterangan: "SKK & KTA Asosiasi", hargaModal: 0, margin: 0, hargaPokok: 1700000, komisiSales: 127040, komisiLeader: 39700, komisiManager: 11910, komisiSso: 50000 },
-  { id: "6", no: 6, layananId: "LY-006", namaLayanan: "SKK - JENJANG 4", kategori: "General", keterangan: "SKK & KTA Asosiasi", hargaModal: 0, margin: 0, hargaPokok: 1500000, komisiSales: 110080, komisiLeader: 34400, komisiManager: 10320, komisiSso: 50000 },
-  { id: "7", no: 7, layananId: "LY-007", namaLayanan: "SKK - JENJANG 3", kategori: "General", keterangan: "SKK & KTA Asosiasi", hargaModal: 0, margin: 0, hargaPokok: 1300000, komisiSales: 99712, komisiLeader: 31160, komisiManager: 9348, komisiSso: 50000 },
-  { id: "8", no: 8, layananId: "LY-008", namaLayanan: "SKK - JENJANG 2", kategori: "General", keterangan: "SKK & KTA Asosiasi", hargaModal: 0, margin: 0, hargaPokok: 1200000, komisiSales: 100096, komisiLeader: 31280, komisiManager: 9384, komisiSso: 50000 },
-  { id: "9", no: 9, layananId: "LY-009", namaLayanan: "SKK - JENJANG 1", kategori: "General", keterangan: "SKK & KTA Asosiasi", hargaModal: 0, margin: 0, hargaPokok: 1100000, komisiSales: 100480, komisiLeader: 31400, komisiManager: 9420, komisiSso: 50000 },
-  { id: "10", no: 10, layananId: "LY-010", namaLayanan: "SBUJK - KECIL", kategori: "General", keterangan: "SBU & KTA Asosiasi", hargaModal: 0, margin: 0, hargaPokok: 1500000, komisiSales: 206720, komisiLeader: 64600, komisiManager: 19380, komisiSso: 50000 },
-  { id: "11", no: 11, layananId: "LY-011", namaLayanan: "SBUJK - MENENGAH", kategori: "General", keterangan: "SBU & KTA Asosiasi", hargaModal: 0, margin: 0, hargaPokok: 4000000, komisiSales: 296640, komisiLeader: 92700, komisiManager: 27810, komisiSso: 50000 },
-  { id: "12", no: 12, layananId: "LY-012", namaLayanan: "SBUJK - BESAR (BUJKN/PMA)", kategori: "General", keterangan: "SBU & KTA Asosiasi", hargaModal: 0, margin: 0, hargaPokok: 12500000, komisiSales: 445792, komisiLeader: 139310, komisiManager: 41793, komisiSso: 50000 },
-  { id: "13", no: 13, layananId: "LY-013", namaLayanan: "SBUJK - BESAR (BUJKA)", kategori: "General", keterangan: "SBU & KTA Asosiasi", hargaModal: 0, margin: 0, hargaPokok: 23000000, komisiSales: 654336, komisiLeader: 204480, komisiManager: 61344, komisiSso: 50000 },
-  { id: "14", no: 14, layananId: "LY-014", namaLayanan: "SBUJK - SPESIALIS 1 (PB&PL)", kategori: "General", keterangan: "SBU & KTA Asosiasi", hargaModal: 0, margin: 0, hargaPokok: 4000000, komisiSales: 276064, komisiLeader: 86270, komisiManager: 25881, komisiSso: 50000 },
-  { id: "15", no: 15, layananId: "LY-015", namaLayanan: "SBUJK - SPESIALIS 2 (IN&KK&KP&PL)", kategori: "General", keterangan: "SBU & KTA Asosiasi", hargaModal: 0, margin: 0, hargaPokok: 10000000, komisiSales: 408218, komisiLeader: 127568, komisiManager: 38270, komisiSso: 50000 },
-  { id: "16", no: 16, layananId: "LY-016", namaLayanan: "SBUJK - SPESIALIS 3 (BUJKA)", kategori: "General", keterangan: "SBU & KTA Asosiasi", hargaModal: 0, margin: 0, hargaPokok: 23000000, komisiSales: 659104, komisiLeader: 205970, komisiManager: 61791, komisiSso: 50000 },
-  { id: "17", no: 17, layananId: "LY-017", namaLayanan: "SERTIFIKAT STANDART - GRADE KECIL", kategori: "General", keterangan: "PER SUB", hargaModal: 0, margin: 0, hargaPokok: 3000000, komisiSales: 403200, komisiLeader: 126000, komisiManager: 37800, komisiSso: 50000 },
-  { id: "18", no: 18, layananId: "LY-018", namaLayanan: "SERTIFIKAT STANDART - GRADE MENENGAH", kategori: "General", keterangan: "PER SUB", hargaModal: 0, margin: 0, hargaPokok: 3000000, komisiSales: 358400, komisiLeader: 112000, komisiManager: 33600, komisiSso: 50000 },
-  { id: "19", no: 19, layananId: "LY-019", namaLayanan: "SERTIFIKAT STANDART - GRADE BESAR/SPESIALIS/KONSULTAN", kategori: "General", keterangan: "PER SUB", hargaModal: 0, margin: 0, hargaPokok: 5000000, komisiSales: 579200, komisiLeader: 181000, komisiManager: 54300, komisiSso: 50000 },
-];
-
 export default function LayananPage() {
-  const [layananList, setLayananList] = useState<Layanan[]>(dummyLayanan);
+  const [layananList, setLayananList] = useState<Layanan[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("Semua");
+  const [categories, setCategories] = useState<string[]>(["Semua"]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -65,14 +49,110 @@ export default function LayananPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [formData, setFormData] = useState<Partial<Layanan>>({});
 
+  const fetchLayanan = async () => {
+    try {
+      setIsLoading(true);
+      const res = await fetchApi("/layanans");
+      if (res.data) {
+        const mapped = res.data.map((item: any, index: number) => ({
+          id: item.id,
+          no: index + 1,
+          layananId: item.layanan_id || "-",
+          namaLayanan: item.nama_layanan || "-",
+          kategori: item.kategori || "-",
+          keterangan: item.keterangan || "-",
+          hargaModal: parseFloat(item.harga_modal) || 0,
+          margin: parseFloat(item.margin) || 0,
+          hargaPokok: parseFloat(item.harga_pokok) || 0,
+          komisiSales: parseFloat(item.komisi_sales) || 0,
+          komisiLeader: parseFloat(item.komisi_leader) || 0,
+          komisiManager: parseFloat(item.komisi_manager) || 0,
+          komisiSso: parseFloat(item.komisi_sso) || 0,
+        }));
+        setLayananList(mapped);
+        
+        // Extract unique categories
+        const cats = new Set(mapped.map((m: any) => m.kategori).filter(Boolean));
+        setCategories(["Semua", ...Array.from(cats) as string[]]);
+      }
+    } catch (error) {
+      console.error("Error fetching layanan:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLayanan();
+  }, []);
+
+  const handleExportCsv = () => {
+    if (layananList.length === 0) return;
+    const headers = [
+      "Layanan ID", "Kategori", "Nama Layanan", "Keterangan", 
+      "Harga Modal", "Margin", "Harga Pokok", 
+      "Komisi Sales", "Komisi Leader", "Komisi Manager", "Komisi SSO"
+    ];
+    const rows = layananList.map(l => [
+      l.layananId,
+      l.kategori,
+      `"${l.namaLayanan}"`,
+      `"${l.keterangan}"`,
+      l.hargaModal,
+      l.margin,
+      l.hargaPokok,
+      l.komisiSales,
+      l.komisiLeader,
+      l.komisiManager,
+      l.komisiSso
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + headers.join(",") + "\n" 
+      + rows.map(e => e.join(",")).join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Master_Layanan_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      await fetchApi("/layanans/import", {
+        method: "POST",
+        body: formData,
+      });
+      alert("Data berhasil diimport!");
+      setIsImportModalOpen(false);
+      fetchLayanan();
+    } catch (error) {
+      console.error(error);
+      alert("Gagal mengimport data!");
+    }
+    
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const formatRupiah = (amount: number) =>
     new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(amount);
 
-  const filteredLayanan = layananList.filter(l =>
-    l.namaLayanan.toLowerCase().includes(searchQuery.toLowerCase()) ||
+  let filteredLayanan = layananList.filter(l =>
+    (l.namaLayanan.toLowerCase().includes(searchQuery.toLowerCase()) ||
     l.kategori.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    l.layananId.toLowerCase().includes(searchQuery.toLowerCase())
+    l.layananId.toLowerCase().includes(searchQuery.toLowerCase()))
   );
+  
+  if (selectedCategory !== "Semua") {
+    filteredLayanan = filteredLayanan.filter(l => l.kategori === selectedCategory);
+  }
 
   return (
     <div className="flex flex-col h-full bg-white rounded-tl-[16px] overflow-hidden">
@@ -88,7 +168,7 @@ export default function LayananPage() {
             Import CSV
           </button>
           <button 
-            onClick={() => alert("Mengekspor data layanan...")}
+            onClick={handleExportCsv}
             className="flex items-center px-3 py-1.5 text-[13px] font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
           >
             <Download className="w-3.5 h-3.5 mr-2 text-gray-500" />
@@ -123,9 +203,22 @@ export default function LayananPage() {
           
           <div className="h-4 w-px bg-gray-300 mx-1"></div>
 
-          <button className="flex items-center px-3 py-1 text-[13px] font-medium text-gray-700 bg-white border border-gray-300 rounded-full hover:bg-gray-50 transition-colors">
-            Kategori: Semua <ChevronDown className="w-3.5 h-3.5 ml-1 text-gray-400" />
-          </button>
+          <div className="relative group">
+            <button className="flex items-center px-3 py-1 text-[13px] font-medium text-gray-700 bg-white border border-gray-300 rounded-full hover:bg-gray-50 transition-colors">
+              Kategori: {selectedCategory} <ChevronDown className="w-3.5 h-3.5 ml-1 text-gray-400" />
+            </button>
+            <div className="absolute left-0 mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg hidden group-hover:block z-50 py-1">
+              {categories.map(cat => (
+                <button 
+                  key={cat} 
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`w-full text-left px-4 py-1.5 text-[13px] hover:bg-gray-50 ${selectedCategory === cat ? 'font-semibold text-brand-600' : 'text-gray-700'}`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
           <button className="flex items-center px-3 py-1 text-[13px] font-medium text-brand-700 hover:bg-brand-50 rounded-full transition-colors">
             <Plus className="w-3.5 h-3.5 mr-1" /> Add filter
           </button>
@@ -299,31 +392,36 @@ export default function LayananPage() {
               Batal
             </button>
             <button 
-              onClick={() => {
-                if (isCreateModalOpen) {
-                  const newL: Layanan = {
-                    id: `LY-${Date.now()}`,
-                    no: layananList.length + 1,
-                    layananId: formData.layananId || `LY-NEW-${layananList.length + 1}`,
-                    namaLayanan: formData.namaLayanan || "Layanan Baru",
-                    kategori: formData.kategori || "Umum",
-                    keterangan: formData.keterangan || "-",
-                    hargaModal: formData.hargaModal || 0,
+              onClick={async () => {
+                try {
+                  const payload = {
+                    layanan_id: formData.layananId,
+                    nama_layanan: formData.namaLayanan,
+                    kategori: formData.kategori,
+                    keterangan: formData.keterangan,
+                    harga_modal: formData.hargaModal || 0,
                     margin: formData.margin || 0,
-                    hargaPokok: formData.hargaPokok || 0,
-                    komisiSales: formData.komisiSales || 0,
-                    komisiLeader: formData.komisiLeader || 0,
-                    komisiManager: formData.komisiManager || 0,
-                    komisiSso: formData.komisiSso || 50000,
+                    harga_pokok: formData.hargaPokok || 0,
+                    komisi_sales: formData.komisiSales || 0,
+                    komisi_leader: formData.komisiLeader || 0,
+                    komisi_manager: formData.komisiManager || 0,
+                    komisi_sso: formData.komisiSso || 50000,
                   };
-                  setLayananList([newL, ...layananList]);
-                  alert("Layanan baru berhasil ditambahkan!");
-                } else {
-                  setLayananList(layananList.map(l => l.id === formData.id ? { ...l, ...formData } as Layanan : l));
-                  alert("Layanan berhasil diperbarui!");
+                  
+                  if (isCreateModalOpen) {
+                    await fetchApi("/layanans", { method: "POST", body: JSON.stringify(payload) });
+                    alert("Layanan baru berhasil ditambahkan!");
+                  } else {
+                    await fetchApi(`/layanans/${formData.id}`, { method: "PUT", body: JSON.stringify(payload) });
+                    alert("Layanan berhasil diperbarui!");
+                  }
+                  
+                  setIsEditModalOpen(false);
+                  setIsCreateModalOpen(false);
+                  fetchLayanan();
+                } catch (error: any) {
+                  alert(error.message || "Gagal menyimpan data layanan");
                 }
-                setIsEditModalOpen(false);
-                setIsCreateModalOpen(false);
               }}
               className="px-4 py-2 text-[13px] font-medium text-white bg-brand-700 rounded hover:bg-brand-800"
             >
@@ -333,6 +431,10 @@ export default function LayananPage() {
         }
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="md:col-span-2">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Layanan ID</label>
+            <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded text-[13px] focus:ring-brand-500 focus:border-brand-500" value={formData.layananId || ''} onChange={e => setFormData({...formData, layananId: e.target.value})} placeholder="Misal: LY-001" />
+          </div>
           <div className="md:col-span-2">
             <label className="block text-xs font-medium text-gray-700 mb-1">Nama Layanan</label>
             <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded text-[13px] focus:ring-brand-500 focus:border-brand-500" value={formData.namaLayanan || ''} onChange={e => setFormData({...formData, namaLayanan: e.target.value})} />
@@ -423,10 +525,20 @@ export default function LayananPage() {
             <FileSpreadsheet className="w-4 h-4 mr-2" />
             Download Template Import
           </button>
-          <div className="border-2 border-dashed border-gray-300 rounded-md p-8 flex flex-col items-center justify-center text-center bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer">
+          <div 
+            onClick={() => fileInputRef.current?.click()}
+            className="border-2 border-dashed border-gray-300 rounded-md p-8 flex flex-col items-center justify-center text-center bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
+          >
             <Upload className="w-8 h-8 text-gray-400 mb-2" />
             <div className="font-medium text-gray-900 mb-1">Pilih File CSV atau Excel</div>
             <div className="text-xs text-gray-500">Max. ukuran file: 10MB</div>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleFileChange} 
+              className="hidden" 
+              accept=".csv, .xlsx, .xls"
+            />
           </div>
         </div>
       </Modal>
