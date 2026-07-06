@@ -1,17 +1,19 @@
 "use client";
 
-import React, { use } from "react";
+import React, { use, useState, useEffect } from "react";
 import { Printer, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
+import { fetchApi } from "@/lib/api";
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
 // Format date in Indonesian
-function formatTanggalIndonesia(date: Date): string {
+function formatTanggalIndonesia(dateString: string): string {
+  const date = new Date(dateString);
   const bulan = [
     "Januari", "Februari", "Maret", "April", "Mei", "Juni",
     "Juli", "Agustus", "September", "Oktober", "November", "Desember"
@@ -29,38 +31,87 @@ export default function InvoicePreviewPage(props: PageProps) {
 
   const title = isProforma ? "PROFORMA INVOICE" : "INVOICE";
   
-  const now = new Date();
-  const tanggalSekarang = formatTanggalIndonesia(now);
+  const [invoice, setInvoice] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const invoiceData = {
-    tanggal: tanggalSekarang,
-    noSurat: `INV-${params.id.split("-")[1]}/Esdea/VI/2026`,
-    namaPerusahaan: params.id === "INV-001" ? "PT. Tambang Alpha" : "PT. Migas Beta",
-    namaPic: "Rian Nugraha",
-    noTelpPic: params.id === "INV-001" ? "081234567890" : "089876543210",
-    items: [
-      {
-        nama_produk: "Pengurusan SBU Jasa Konstruksi",
-        keterangan: "Sertifikasi Badan Usaha",
-        qty: 1,
-        harga_jual: 15000000,
-        sub_total: 15000000
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        const res = await fetchApi(`/invoices/${params.id}`);
+        setInvoice(res.data || res);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
       }
-    ],
-    total: 15000000,
-    diskon: 0,
-    grand_total: 15000000,
-    // DP and Pelunasan logic
-    dp_amount: 7500000,
-    pelunasan_amount: 7500000,
-  };
-
-  const amountToPay = isDp ? invoiceData.dp_amount : invoiceData.pelunasan_amount;
-  const paymentLabel = isDp ? "Down Payment (DP 50%)" : "Pelunasan (BP 50%)";
+    };
+    loadData();
+  }, [params.id]);
 
   const formatRupiah = (amount: number) => {
     return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(amount);
   };
+
+  const downloadPdfServer = async () => {
+    try {
+      const Cookies = (await import('js-cookie')).default;
+      const token = Cookies.get('auth_token');
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+      const res = await fetch(`${baseUrl}/invoices/${params.id}/pdf`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!res.ok) throw new Error('Gagal mengunduh PDF');
+      
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Invoice-${invoice?.quotation?.no_quotation || params.id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(error);
+      alert('Gagal mengunduh PDF dari server.');
+    }
+  };
+
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center bg-gray-100">Memuat data...</div>;
+  }
+
+  if (error || !invoice || !invoice.quotation) {
+    return <div className="min-h-screen flex items-center justify-center bg-gray-100 text-red-600">Error: {error || 'Data tidak ditemukan'}</div>;
+  }
+
+  const tanggalSekarang = formatTanggalIndonesia(invoice.created_at);
+  
+  const quotation = invoice.quotation;
+  const baseNoQuotation = quotation.no_quotation || "";
+  
+  // Format no surat: replace "QT-" with "PI-" or "IN-"
+  let noSurat = baseNoQuotation;
+  if (baseNoQuotation.startsWith("QT-")) {
+    noSurat = baseNoQuotation.replace("QT-", isProforma ? "PI-" : "IN-");
+  } else {
+    // Fallback if the old format is still there (should not happen since we migrated)
+    noSurat = (isProforma ? "PI-" : "IN-") + baseNoQuotation;
+  }
+
+  const grandTotal = parseFloat(quotation.total_amount) || 0;
+  const persentaseDp = parseFloat(invoice.persentase_dp) || 50;
+  
+  const dpAmount = (grandTotal * persentaseDp) / 100;
+  const bpAmount = grandTotal - dpAmount;
+
+  const amountToPay = isDp ? dpAmount : bpAmount;
+  const paymentLabel = isDp ? `Down Payment (DP ${persentaseDp}%)` : `Pelunasan (BP ${100 - persentaseDp}%)`;
 
   const PageHeader = () => (
     <div className="w-full shrink-0">
@@ -103,19 +154,19 @@ export default function InvoicePreviewPage(props: PageProps) {
 
             <h2 className="text-lg font-bold text-center mb-6">{title}</h2>
 
-            <div className="text-[11px] leading-relaxed mb-1 text-right">{invoiceData.tanggal}</div>
+            <div className="text-[11px] leading-relaxed mb-1 text-right">{tanggalSekarang}</div>
 
             <table className="text-[11px] leading-relaxed mb-4">
               <tbody>
-                <tr><td className="pr-2 align-top">No Invoice</td><td className="pr-2 align-top">:</td><td>{invoiceData.noSurat}</td></tr>
+                <tr><td className="pr-2 align-top">No Invoice</td><td className="pr-2 align-top">:</td><td>{noSurat}</td></tr>
                 <tr><td className="pr-2 align-top">Hal</td><td className="pr-2 align-top">:</td><td>Tagihan {paymentLabel}</td></tr>
               </tbody>
             </table>
 
             <div className="text-[11px] mb-6 leading-relaxed">
               <p>Kepada Yth,</p>
-              <p className="font-bold">{invoiceData.namaPerusahaan}</p>
-              <p>Up. {invoiceData.namaPic} - {invoiceData.noTelpPic}</p>
+              <p className="font-bold">{quotation.lead?.nama_perusahaan}</p>
+              <p>Up. {quotation.lead?.nama_pic || '-'} {quotation.lead?.no_wa ? `(${quotation.lead.no_wa})` : ''}</p>
             </div>
 
             {/* Dynamic Table */}
@@ -128,23 +179,28 @@ export default function InvoicePreviewPage(props: PageProps) {
                 </tr>
               </thead>
               <tbody>
-                {invoiceData.items.map((item, idx) => (
-                  <tr key={idx}>
-                    <td className="border border-gray-700 py-2.5 text-center align-top">{idx + 1}</td>
-                    <td className="border border-gray-700 py-2.5 px-3 align-top">
-                      <strong>{item.nama_produk}</strong><br/>
-                      <span className="text-[10px]">{item.keterangan}</span>
-                    </td>
-                    <td className="border border-gray-700 py-2.5 px-3 text-right align-top">
-                      {formatRupiah(item.sub_total)}
-                    </td>
-                  </tr>
-                ))}
+                {quotation.items?.map((item: any, idx: number) => {
+                  const harga = parseFloat(item.harga_jual_input);
+                  const qty = parseInt(item.qty);
+                  const subTotal = harga * qty;
+                  return (
+                    <tr key={idx}>
+                      <td className="border border-gray-700 py-2.5 text-center align-top">{idx + 1}</td>
+                      <td className="border border-gray-700 py-2.5 px-3 align-top">
+                        <strong>{item.layanan?.nama_layanan}</strong><br/>
+                        <span className="text-[10px]">{item.layanan?.kategori}</span>
+                      </td>
+                      <td className="border border-gray-700 py-2.5 px-3 text-right align-top">
+                        {formatRupiah(subTotal)}
+                      </td>
+                    </tr>
+                  );
+                })}
                 
                 {/* Calculations */}
                 <tr className="font-bold">
                   <td colSpan={2} className="border border-gray-700 py-1.5 px-3 text-right">Grand Total Keseluruhan</td>
-                  <td className="border border-gray-700 py-1.5 px-3 text-right">{formatRupiah(invoiceData.grand_total)}</td>
+                  <td className="border border-gray-700 py-1.5 px-3 text-right">{formatRupiah(grandTotal)}</td>
                 </tr>
                 <tr className="font-bold bg-yellow-50">
                   <td colSpan={2} className="border border-gray-700 py-2 px-3 text-right">
@@ -173,7 +229,7 @@ export default function InvoicePreviewPage(props: PageProps) {
               </div>
             </div>
 
-            <p className="text-[11px] mb-6">Bekasi, {invoiceData.tanggal}</p>
+            <p className="text-[11px] mb-6">Bekasi, {tanggalSekarang}</p>
 
             {/* Signature Block - Only Esdea for invoice */}
             <div className="flex justify-start text-[11px] mb-4">
